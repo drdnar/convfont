@@ -1,0 +1,8 @@
+.vs/
+Debug/
+x64/
+x86/
+*.vcxproj.user
+convfont
+/convfont.VC.VC.opendb
+/convfont.VC.db
