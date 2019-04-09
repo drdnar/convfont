@@ -65,7 +65,7 @@ void serialize_font(fontlib_font_t *font, void(*output)(uint8_t byte, void *cust
 	for (int i = 0; i < font->total_glyphs; i++) {
 		output_word((uint16_t)(next_bitmap_offset - 2 + (byte_columns(font->widths_table[i]) - 1)), output, custom_data);
 		next_bitmap_offset += font->bitmaps[i]->length;
-		if (next_bitmap_offset >= 0xFFF0)
+		if (next_bitmap_offset >= MAX_APPVAR_SIZE)
 			throw_error(invalid_fnt, "Output font too big to fit!");
 	}
 	/* Start writing glyph bitmaps */

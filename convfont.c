@@ -308,8 +308,11 @@ int main(int argc, char *argv[]) {
         throw_error(bad_outfile, "Cannot open output file.");
     if (output_format == output_fontpack) {
         /* Write header */
-        if (font_pack_name == NULL)
+        if (font_pack_name == NULL) {
+            fclose(out_file);
+            remove(argv[optind]);
             throw_error(bad_options, "Must specify a font pack name (-N).");
+        }
         for (char* s = "FONTPACK"; *s != '\0'; s++)
             fputc(*s, out_file);
         /* Offset to metadata */
@@ -320,7 +323,9 @@ int main(int argc, char *argv[]) {
         /* Fonts table */
         for (int i = 0; i < fonts_loaded; location += compute_font_size(fonts[i++]))
             output_ezword(location, output_format_byte, out_file);
-        if (location >= 0xFFF0) {
+        /* TODO: Still need to serialize font metadata */
+        throw_error(internal_error, "Font pack: not fully implemented.");
+        if (location >= MAX_APPVAR_SIZE) {
             fclose(out_file);
             remove(argv[optind]);
             throw_error(bad_options, "Cannot form appvar; output appvar size would exceed 64 K appvar size limit.");

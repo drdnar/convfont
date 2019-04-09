@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define MAX_APPVAR_SIZE 0xFFE8
 
 typedef enum {
     output_unspecified = 0,
