@@ -28,13 +28,13 @@ true
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 0
 
-void throw_error(int code, char *string) {
+void throw_error(const int code, const char *string) {
     if (string != NULL)
         fprintf(stderr, "ERROR: %s\n", string);
     exit(code);
 }
 
-void output_format_byte(uint8_t byte, void *custom_data) {
+void output_format_byte(const uint8_t byte, void *custom_data) {
     fputc(byte, custom_data);
 }
 
@@ -50,7 +50,7 @@ void print_newline(FILE *file) {
     fputc('\n', file);
 }
 
-void output_format_c_array(uint8_t byte, void *custom_data) {
+void output_format_c_array(const uint8_t byte, void *custom_data) {
     format_c_array_data_t *state = (format_c_array_data_t *)custom_data;
     if (!state->row_counter)
         if (state->first_line)
@@ -64,6 +64,11 @@ void output_format_c_array(uint8_t byte, void *custom_data) {
         state->row_counter = (state->row_counter + 1) % 16;
 }
 
+void write_string(char *string, FILE *out_file) {
+    while (*string++ != '\0')
+        fputc(*string, out_file);
+    fputc(*string, out_file);
+}
 
 void show_help(char *name) {
     printf("convfont v%u.%u by drdnar\n\n"
@@ -95,10 +100,11 @@ void show_help(char *name) {
         "\tNumbers may be prefixed with 0x to specify hexadecimal instead of decimal.\n"
         "\nFont pack properties:\n"
         "\t-N: \"<s>\" font pack Name\n"
+        "\t-A: \"<s>\" Author\n"
         "\t-C: \"<s>\" pseudoCopyright\n"
         "\t-D: \"<s>\" Description\n"
         "\t-V: \"<s>\" Version\n"
-        "\t-P: \"<s>\" codePage\n", VERSION_MAJOR, VERSION_MINOR, name);
+        "\t-P: \"<s>\" code Page\n", VERSION_MAJOR, VERSION_MINOR, name);
 }
 
 
@@ -130,6 +136,7 @@ int main(int argc, char *argv[]) {
 
     /* Settings */
     char *font_pack_name = NULL;
+    char *author = NULL;
     char *pseudocopyright = NULL;
     char *description = NULL;
     char *version = NULL;
@@ -142,7 +149,7 @@ int main(int argc, char *argv[]) {
 
     int option;
 
-    while ((option = getopt(argc, argv, "ho:Zf:a:b:i:w:s:c:x:l:N:C:D:V:P:")) != -1) {
+    while ((option = getopt(argc, argv, "ho:Zf:a:b:i:w:s:c:x:l:N:A:C:D:V:P:")) != -1) {
         switch (option) {
             case 'h':
                 show_help(argv[0]);
@@ -260,13 +267,26 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-N: Must specify font pack output format.");
                 if (font_pack_name != NULL)
                     throw_error(bad_options, "-N: Duplicate.");
+                if (strlen(optarg) > 255)
+                    printf("-N: Recommend against such a long string.\n");
                 font_pack_name = optarg;
                 break;
+            case 'A':
+                if (output_format != output_fontpack)
+                    throw_error(bad_options, "-A: Must specify font pack output format.");
+                if (font_pack_name != NULL)
+                    throw_error(bad_options, "-A: Duplicate.");
+                if (strlen(optarg) > 255)
+                    printf("-A: Recommend against such a long string.  You are not an aristocrat.\n");
+                author = optarg;
+                break; 
             case 'C':
                 if (output_format != output_fontpack)
                     throw_error(bad_options, "-C: Must specify font pack output format.");
                 if (font_pack_name != NULL)
                     throw_error(bad_options, "-C: Duplicate.");
+                if (strlen(optarg) > 255)
+                    throw_error(bad_options, "-C: Screw the copyright lawyers.  You don't need such a long copyright string.\n");
                 pseudocopyright = optarg;
                 break;
             case 'D':
@@ -274,6 +294,8 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-D: Must specify font pack output format.");
                 if (font_pack_name != NULL)
                     throw_error(bad_options, "-D: Duplicate.");
+                if (strlen(optarg) > 255)
+                    printf("-D: Recommend against such a long string.  (It's called the \"description\" field, not \"dissertation\"!)\n");
                 description = optarg;
                 break;
             case 'V':
@@ -281,6 +303,8 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-V: Must specify font pack output format.");
                 if (font_pack_name != NULL)
                     throw_error(bad_options, "-V: Duplicate.");
+                if (strlen(optarg) > 255)
+                    printf("-V: Recommend against such a long string.  (It's called the version field, not the changelog!)\n");
                 version = optarg;
                 break;
             case 'P':
@@ -288,6 +312,8 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-P: Must specify font pack output format.");
                 if (font_pack_name != NULL)
                     throw_error(bad_options, "-P: Duplicate.");
+                if (strlen(optarg) > 255)
+                    printf("-P: Strongly recommend against such a long string.  (What, are you trying to embed a complete Unicode translation table?)\n");
                 codepage = optarg;
                 break;
             case '?':
@@ -308,27 +334,72 @@ int main(int argc, char *argv[]) {
         throw_error(bad_outfile, "Cannot open output file.");
     if (output_format == output_fontpack) {
         /* Write header */
-        if (font_pack_name == NULL) {
-            fclose(out_file);
-            remove(argv[optind]);
-            throw_error(bad_options, "Must specify a font pack name (-N).");
-        }
-        for (char* s = "FONTPACK"; *s != '\0'; s++)
+        for (char *s = "FONTPACK"; *s != '\0'; s++)
             fputc(*s, out_file);
         /* Offset to metadata */
         int location = 12 + fonts_loaded * 3;
-        output_ezword(location, output_format_byte, out_file);
+        int mdlocation = location;
+        bool no_metadata = font_pack_name == author == pseudocopyright == description == version == codepage == NULL;
+        if (no_metadata)
+            output_ezword(0, output_format_byte, out_file);
+        else {
+            output_ezword(location, output_format_byte, out_file);
+            location += 21;
+            if (font_pack_name != NULL)
+                location += strlen(font_pack_name) + 1;
+            if (author != NULL)
+                location += strlen(author) + 1;
+            if (pseudocopyright != NULL)
+                location += strlen(pseudocopyright) + 1;
+            if (description != NULL)
+                location += strlen(description) + 1;
+            if (version != NULL)
+                location += strlen(version) + 1;
+            if (codepage != NULL)
+                location += strlen(codepage) + 1;
+        }
         /* Font count */
         fputc(fonts_loaded, out_file);
         /* Fonts table */
         for (int i = 0; i < fonts_loaded; location += compute_font_size(fonts[i++]))
             output_ezword(location, output_format_byte, out_file);
-        /* TODO: Still need to serialize font metadata */
-        throw_error(internal_error, "Font pack: not fully implemented.");
         if (location >= MAX_APPVAR_SIZE) {
             fclose(out_file);
             remove(argv[optind]);
             throw_error(bad_options, "Cannot form appvar; output appvar size would exceed 64 K appvar size limit.");
+        }
+        /* Serialize font metadata */
+        if (!no_metadata) {
+            output_ezword(mdlocation, output_format_byte, out_file);
+            if (font_pack_name != NULL)
+                mdlocation += strlen(font_pack_name) + 1;
+            output_ezword(mdlocation, output_format_byte, out_file);
+            if (author != NULL)
+                mdlocation += strlen(author) + 1;
+            output_ezword(mdlocation, output_format_byte, out_file);
+            if (pseudocopyright != NULL)
+                mdlocation += strlen(pseudocopyright) + 1;
+            output_ezword(mdlocation, output_format_byte, out_file);
+            if (description != NULL)
+                mdlocation += strlen(description) + 1;
+            output_ezword(mdlocation, output_format_byte, out_file);
+            if (version != NULL)
+                mdlocation += strlen(version) + 1;
+            output_ezword(mdlocation, output_format_byte, out_file);
+            if (codepage != NULL)
+                mdlocation += strlen(codepage) + 1;
+            if (font_pack_name != NULL)
+                write_string(font_pack_name, out_file);
+            if (author != NULL)
+                write_string(author, out_file);
+            if (pseudocopyright != NULL)
+                write_string(pseudocopyright, out_file);
+            if (description != NULL)
+                write_string(description, out_file);
+            if (version != NULL)
+                write_string(version, out_file);
+            if (codepage != NULL)
+                write_string(codepage, out_file);
         }
         for (int i = 0; i < fonts_loaded; i++) {
             current_font = fonts[i];
