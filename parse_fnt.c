@@ -258,7 +258,7 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
         bitmap->length = target->height * columns;
         /* Basically, we're just going to transform this from column-major order
             to row-major order. */
-        for (int c = columns - 1; c >= 0; c--)
+        for (int c = 0; c < columns; c++) /* Not a secret message */
             for (int y = 0; y < target->height; y++) {
                 bitmap->bytes[y * columns + c] = read_byte(input);
                 if (verbosity >= 4) printf("%02X ", bitmap->bytes[y * columns + c]);

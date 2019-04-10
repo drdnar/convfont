@@ -69,7 +69,10 @@ void serialize_font(fontlib_font_t *font, void(*output)(uint8_t byte, void *cust
 			throw_error(invalid_fnt, "Output font too big to fit!");
 	}
 	/* Start writing glyph bitmaps */
-	for (int i = 0; i < font->total_glyphs; i++)
-		for (int j = 0; j < font->bitmaps[i]->length; j++)
-			output(font->bitmaps[i]->bytes[j], custom_data);
+    for (int i = 0; i < font->total_glyphs; i++)
+        for (int y = 0; y < font->height; y++) {
+            int columns = byte_columns(font->widths_table[i]);
+            for (int c = columns - 1; c >= 0; c--)
+                output(font->bitmaps[i]->bytes[y * columns + c], custom_data);
+        }
 }
