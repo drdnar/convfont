@@ -274,7 +274,7 @@ int main(int argc, char *argv[]) {
             case 'A':
                 if (output_format != output_fontpack)
                     throw_error(bad_options, "-A: Must specify font pack output format.");
-                if (font_pack_name != NULL)
+                if (author != NULL)
                     throw_error(bad_options, "-A: Duplicate.");
                 if (strlen(optarg) > 255)
                     printf("-A: Recommend against such a long string.  You are not an aristocrat.\n");
@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
             case 'C':
                 if (output_format != output_fontpack)
                     throw_error(bad_options, "-C: Must specify font pack output format.");
-                if (font_pack_name != NULL)
+                if (pseudocopyright != NULL)
                     throw_error(bad_options, "-C: Duplicate.");
                 if (strlen(optarg) > 255)
                     throw_error(bad_options, "-C: Screw the copyright lawyers.  You don't need such a long copyright string.\n");
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
             case 'D':
                 if (output_format != output_fontpack)
                     throw_error(bad_options, "-D: Must specify font pack output format.");
-                if (font_pack_name != NULL)
+                if (description != NULL)
                     throw_error(bad_options, "-D: Duplicate.");
                 if (strlen(optarg) > 255)
                     printf("-D: Recommend against such a long string.  (It's called the \"description\" field, not \"dissertation\"!)\n");
@@ -301,7 +301,7 @@ int main(int argc, char *argv[]) {
             case 'V':
                 if (output_format != output_fontpack)
                     throw_error(bad_options, "-V: Must specify font pack output format.");
-                if (font_pack_name != NULL)
+                if (version != NULL)
                     throw_error(bad_options, "-V: Duplicate.");
                 if (strlen(optarg) > 255)
                     printf("-V: Recommend against such a long string.  (It's called the version field, not the changelog!)\n");
@@ -310,7 +310,7 @@ int main(int argc, char *argv[]) {
             case 'P':
                 if (output_format != output_fontpack)
                     throw_error(bad_options, "-P: Must specify font pack output format.");
-                if (font_pack_name != NULL)
+                if (codepage != NULL)
                     throw_error(bad_options, "-P: Duplicate.");
                 if (strlen(optarg) > 255)
                     printf("-P: Strongly recommend against such a long string.  (What, are you trying to embed a complete Unicode translation table?)\n");
