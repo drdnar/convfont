@@ -26,8 +26,8 @@ true
 #endif
 ;
 
-#define VERSION_MAJOR 1
-#define VERSION_MINOR 0
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 8
 
 int verbosity = 0;
 
@@ -74,8 +74,7 @@ void write_string(char *string, FILE *out_file) {
 }
 
 void show_help(char *name) {
-    printf("convfont v%u.%u by drdnar\n\n"
-	"Usage:\n"
+    printf("\nUsage:\n"
 	"\t%s -o <output format> -f <font FNT> [-metrics] [-f <font FNT 2> [-metrics]] <output file name>\n"
         "\tSpecifying more than one input font is only valid for the font pack output format.\n"
         "\nOutput formats:\n"
@@ -107,7 +106,7 @@ void show_help(char *name) {
         "\t-C: \"<s>\" pseudoCopyright\n"
         "\t-D: \"<s>\" Description\n"
         "\t-V: \"<s>\" Version\n"
-        "\t-P: \"<s>\" code Page\n", VERSION_MAJOR, VERSION_MINOR, name);
+        "\t-P: \"<s>\" code Page\n", name);
 }
 
 
@@ -130,6 +129,8 @@ int fonts_loaded = 0;
 int main(int argc, char *argv[]) {
     FILE *in_file;
     FILE *out_file;
+
+    printf("convfont v%u.%u by drdnar\n", VERSION_MAJOR, VERSION_MINOR);
 
     if (argc <= 1) {
         printf("No inputs supplied.\n\n");
@@ -515,6 +516,7 @@ int main(int argc, char *argv[]) {
         current_font = NULL;
         fonts[0] = NULL;
     }
+    printf("Output size: %i bytes; conversion finished.\n", ftell(out_file));
     fclose(out_file);
 
     return 0;
