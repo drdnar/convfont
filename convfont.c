@@ -65,9 +65,9 @@ void output_format_c_array(const uint8_t byte, void *custom_data) {
 }
 
 void write_string(char *string, FILE *out_file) {
-    while (*string++ != '\0')
+    do
         fputc(*string, out_file);
-    fputc(*string, out_file);
+    while (*string++ != '\0');
 }
 
 void show_help(char *name) {
@@ -338,13 +338,14 @@ int main(int argc, char *argv[]) {
             fputc(*s, out_file);
         /* Offset to metadata */
         int location = 12 + fonts_loaded * 3;
-        int mdlocation = location;
+        int mdlocation = 0;
         bool no_metadata = font_pack_name == NULL && author == NULL && pseudocopyright == NULL && description == NULL && version == NULL && codepage == NULL;
         if (no_metadata)
             output_ezword(0, output_format_byte, out_file);
         else {
             output_ezword(location, output_format_byte, out_file);
-            location += 21;
+            location += MEATADATA_STRUCT_SIZE;
+            mdlocation = location;
             if (font_pack_name != NULL)
                 location += strlen(font_pack_name) + 1;
             if (author != NULL)
@@ -370,24 +371,37 @@ int main(int argc, char *argv[]) {
         }
         /* Serialize font metadata */
         if (!no_metadata) {
-            output_ezword(mdlocation, output_format_byte, out_file);
-            if (font_pack_name != NULL)
+            output_ezword(MEATADATA_STRUCT_SIZE, output_format_byte, out_file);
+            if (font_pack_name != NULL) {
+                output_ezword(mdlocation, output_format_byte, out_file);
                 mdlocation += strlen(font_pack_name) + 1;
-            output_ezword(mdlocation, output_format_byte, out_file);
-            if (author != NULL)
+            } else
+                output_ezword(0, output_format_byte, out_file);
+            if (author != NULL) {
+                output_ezword(mdlocation, output_format_byte, out_file);
                 mdlocation += strlen(author) + 1;
-            output_ezword(mdlocation, output_format_byte, out_file);
-            if (pseudocopyright != NULL)
+            } else
+                output_ezword(0, output_format_byte, out_file);
+            if (pseudocopyright != NULL) {
+                output_ezword(mdlocation, output_format_byte, out_file);
                 mdlocation += strlen(pseudocopyright) + 1;
-            output_ezword(mdlocation, output_format_byte, out_file);
-            if (description != NULL)
+            } else
+                output_ezword(0, output_format_byte, out_file);
+            if (description != NULL) {
+                output_ezword(mdlocation, output_format_byte, out_file);
                 mdlocation += strlen(description) + 1;
-            output_ezword(mdlocation, output_format_byte, out_file);
-            if (version != NULL)
+            } else
+                output_ezword(0, output_format_byte, out_file);
+            if (version != NULL) {
+                output_ezword(mdlocation, output_format_byte, out_file);
                 mdlocation += strlen(version) + 1;
-            output_ezword(mdlocation, output_format_byte, out_file);
-            if (codepage != NULL)
+            } else
+                output_ezword(0, output_format_byte, out_file);
+            if (codepage != NULL) {
+                output_ezword(mdlocation, output_format_byte, out_file);
                 mdlocation += strlen(codepage) + 1;
+            } else
+                output_ezword(0, output_format_byte, out_file);
             if (font_pack_name != NULL)
                 write_string(font_pack_name, out_file);
             if (author != NULL)

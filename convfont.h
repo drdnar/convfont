@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #define MAX_APPVAR_SIZE 0xFFE8
+#define MEATADATA_STRUCT_SIZE 21
 
 typedef enum {
     output_unspecified = 0,
