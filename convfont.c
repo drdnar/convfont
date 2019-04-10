@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
         /* Offset to metadata */
         int location = 12 + fonts_loaded * 3;
         int mdlocation = location;
-        bool no_metadata = font_pack_name == author == pseudocopyright == description == version == codepage == NULL;
+        bool no_metadata = font_pack_name == NULL && author == NULL && pseudocopyright == NULL && description == NULL && version == NULL && codepage == NULL;
         if (no_metadata)
             output_ezword(0, output_format_byte, out_file);
         else {

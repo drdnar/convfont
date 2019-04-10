@@ -168,4 +168,4 @@ return ((width - 1) >> 3) + 1;
  * row for a glyph. */
 #define byte_columns(width) ((((width) - 1) >> 3) + 1)
 
-void throw_error(int code, char *string);
+void throw_error(const int code, const char *string);
