@@ -28,6 +28,8 @@ true
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 0
 
+int verbosity = 0;
+
 void throw_error(const int code, const char *string) {
     if (string != NULL)
         fprintf(stderr, "ERROR: %s\n", string);
@@ -149,11 +151,14 @@ int main(int argc, char *argv[]) {
 
     int option;
 
-    while ((option = getopt(argc, argv, "ho:Zf:a:b:i:w:s:c:x:l:N:A:C:D:V:P:")) != -1) {
+    while ((option = getopt(argc, argv, "hvo:Zf:a:b:i:w:s:c:x:l:N:A:C:D:V:P:")) != -1) {
         switch (option) {
             case 'h':
                 show_help(argv[0]);
                 return 0;
+            case 'v':
+                verbosity++;
+                break;
             case 'o':
                 if (output_format != output_unspecified)
                     throw_error(bad_options, "-o: Cannot specify more than one output format.");
@@ -188,6 +193,8 @@ int main(int argc, char *argv[]) {
                 if (fonts_loaded >= MAX_FONTS - 1)
                     throw_error(bad_options, "-f: Too many fonts.  What on Earth makes you think your font pack needs so many fonts?");
                 recent_input_file_name = optarg;
+                if (verbosity >= 1)
+                    printf("Processing input file %s . . .\n", recent_input_file_name);
                 in_file = fopen(recent_input_file_name, "rb");
                 if (!in_file)
                     throw_error(bad_infile, "-f: Cannot open input file.");
@@ -326,6 +333,8 @@ int main(int argc, char *argv[]) {
         throw_error(bad_options, "Last parameter must be output file name; none was given.");
     if (optind < argc - 1)
         throw_error(bad_options, "Too many trailing parameters.");
+    if (current_font == NULL)
+        throw_error(bad_options, "No input font(s) given. . . . Nothing to do.");
 
     /* Now write output */
     format_c_array_data_t c_array_data;

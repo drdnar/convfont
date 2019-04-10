@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "convfont.h"
+
 uint8_t read_byte(FILE *input);
 
 int16_t read_word(FILE *input);
