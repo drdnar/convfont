@@ -14,7 +14,7 @@ int compute_font_size(fontlib_font_t *font) {
 	int size = 18;
 	size += 3 * font->total_glyphs;
 	for (int i = 0; i < font->total_glyphs; i++)
-		size += byte_columns(font->bitmaps[i]->length) * font->height;
+		size += font->bitmaps[i]->length;
 	return size;
 }
 
