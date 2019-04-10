@@ -8,6 +8,7 @@
 
 #ifdef _MSC_VER
 #include "getopt.h"
+#pragma warning(disable : 4996)
 #else
 #include <getopt.h>
 #endif

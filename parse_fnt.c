@@ -215,7 +215,7 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
         for (int i = 0; i < totalGlyphs; i++) {
             dfCharTableWidths[i] = read_word(input);
             dfCharTableOffsets[i] = read_dword(input);
-            if (verbosity >= 3) printf("\tGlyph: 0x%02 width: %i @ 0x%08X\n", i, dfCharTableWidths[i], dfCharTableOffsets[i]);
+            if (verbosity >= 3) printf("\tGlyph: 0x%02X width: %i @ 0x%08X\n", i, dfCharTableWidths[i], dfCharTableOffsets[i]);
             if (dfCharTableOffsets[i] > dfSize)
                 throw_error(invalid_fnt, "Glyph bitmap location offset is past declared end of FNT struct.");
         }
