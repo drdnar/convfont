@@ -42,7 +42,7 @@ void serialize_font(fontlib_font_t *font, void(*output)(uint8_t byte, void *cust
 	/* Write header */
 	output(font->fontVersion, custom_data);
 	output(font->height, custom_data);
-	output(font->total_glyphs, custom_data);
+	output(font->total_glyphs & 0xFF, custom_data);
 	output(font->first_glyph, custom_data);
 	/* These values come from the data format */
 	output_ezword(18, output, custom_data);

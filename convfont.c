@@ -27,7 +27,7 @@ true
 ;
 
 #define VERSION_MAJOR 0
-#define VERSION_MINOR 9
+#define VERSION_MINOR 91
 
 int verbosity = 0;
 
@@ -445,7 +445,7 @@ int main(int argc, char *argv[]) {
                 fprintf(out_file, ".header:"); print_newline(out_file);
                 fprintf(out_file, "\tdb\t0 ; font format version"); print_newline(out_file);
                 fprintf(out_file, "\tdb\t%i ; height", current_font->height); print_newline(out_file);
-                fprintf(out_file, "\tdb\t%i ; glyph count", current_font->total_glyphs); print_newline(out_file);
+                fprintf(out_file, "\tdb\t%i ; glyph count", current_font->total_glyphs & 0xFF); print_newline(out_file);
                 fprintf(out_file, "\tdb\t%i ; first glyph", current_font->first_glyph); print_newline(out_file);
                 fprintf(out_file, "\tdl\t.widthsTable - .header ; offset to widths table"); print_newline(out_file);
                 fprintf(out_file, "\tdl\t.bitmapsTable - .header ; offset to bitmaps offsets table"); print_newline(out_file);

@@ -38,7 +38,7 @@ typedef struct {
     /* Height in pixels */
     uint8_t height;
     /* Total number of glyphs provided. */
-    uint8_t total_glyphs;
+    uint16_t total_glyphs;
     /* Number of first glyph.  If you have no codepoints below 32, for
     example, you can omit the first 32 bitmaps. */
     uint8_t first_glyph;

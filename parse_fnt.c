@@ -211,7 +211,11 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
             if (dfCharTableOffsets[i] > dfSize)
                 throw_error(invalid_fnt, "Glyph bitmap location offset is past declared end of FNT struct.");
         }
-    else
+    else {
+        /* Dummy entry needed for some crazy reason */
+        int dummy1 = read_word(input);
+        int dummy2 = read_dword(input);
+        if (verbosity >= 3) printf("\tDummy entry: width: %i @ 0x%08X\n", dummy1, dummy2);
         for (int i = 0; i < totalGlyphs; i++) {
             dfCharTableWidths[i] = read_word(input);
             dfCharTableOffsets[i] = read_dword(input);
@@ -219,15 +223,18 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
             if (dfCharTableOffsets[i] > dfSize)
                 throw_error(invalid_fnt, "Glyph bitmap location offset is past declared end of FNT struct.");
         }
+    }
 
     target->fontVersion = 0;
     target->height = (uint8_t)dfPixHeight;
-    target->total_glyphs = (uint8_t)(dfLastChar - dfFirstChar + 1);
+    if (dfLastChar < dfFirstChar)
+        throw_error(invalid_fnt, "Negative bitmaps present! (dfFirstChar > dfLastChar)");
+    target->total_glyphs = (uint16_t)(dfLastChar - dfFirstChar + 1);
     target->first_glyph = dfFirstChar;
-    target->widths_table = calloc(target->total_glyphs, sizeof(uint8_t));
+    target->widths_table = calloc(totalGlyphs, sizeof(uint8_t));
     if (!target->widths_table)
         throw_error(malloc_failed, "parse_fnt: failed to calloc widths_table");
-    target->bitmaps = calloc(target->total_glyphs, sizeof(fontlib_bitmap_t*));
+    target->bitmaps = calloc(totalGlyphs, sizeof(fontlib_bitmap_t*));
     if (!target->bitmaps)
         throw_error(malloc_failed, "parse_fnt: failed to calloc bitmaps table");
     target->italic_space_adjust = 0;
@@ -240,18 +247,16 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
     target->baseline_height = (uint8_t)dfAscent;
 
     if (verbosity >= 2) printf("Parsing glyphs . . .\n");
-    for (int i = 0; i < target->total_glyphs; i++) {
+    for (int i = 0; i < totalGlyphs; i++) {
         if (verbosity >= 4) printf("\tGlyph: 0x%02X data: ", i);
-        /* I'm not sure where in the spec this comes from, but whatever, it's needed to work right. */
-        int starting_offset = dfVersion == 0x300 ? 1 : 0;
-        if (dfCharTableWidths[i + starting_offset] > 24)
+        if (dfCharTableWidths[i] > 24)
             throw_error(invalid_fnt, "Glyph widths greater than 24 are not supported.");
-        if (dfCharTableWidths[i + starting_offset] == 0)
+        if (dfCharTableWidths[i] == 0)
             throw_error(invalid_fnt, "Zero-width glyph is a bad idea.");
-        target->widths_table[i] = (uint8_t)dfCharTableWidths[i + starting_offset];
+        target->widths_table[i] = (uint8_t)dfCharTableWidths[i];
         if (fseek(input, offset + dfCharTableOffsets[i], SEEK_SET))
             throw_error(invalid_fnt, "fseek() failed.");
-        int columns = byte_columns(dfCharTableWidths[i + starting_offset]);
+        int columns = byte_columns(dfCharTableWidths[i]);
         fontlib_bitmap_t *bitmap = malloc(sizeof(fontlib_bitmap_t) + target->height * columns - sizeof(uint8_t));
         if (!bitmap)
             throw_error(malloc_failed, "parse_fnt: failed to malloc bitmap");
