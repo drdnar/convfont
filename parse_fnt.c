@@ -163,7 +163,7 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
     int32_t dfBitsPointer = read_dword(input);
     if (verbosity >= 3) printf("dfBitsPointer: 0x%08X\n", dfBitsPointer);
     int32_t dfBitsOffset = read_dword(input);
-    if (verbosity >= 3) printf("dfBitsPointer: 0x%08X\n", dfBitsPointer);
+    if (verbosity >= 3) printf("dfBitsOffset: 0x%08X\n", dfBitsOffset);
     uint8_t dfReserved = read_byte(input);
     if (verbosity >= 2) printf("dfReserved: 0x%02X\n", dfReserved);
     /* Version 3.0 stuff */
