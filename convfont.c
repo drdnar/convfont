@@ -61,10 +61,11 @@ void output_format_c_array(const uint8_t byte, void *custom_data) {
         else {
             fputc(',', state->file);
             print_newline(state->file);
-        } else
-            fprintf(state->file, ", ");
-        fprintf(state->file, "0x%02X", byte);
-        state->row_counter = (state->row_counter + 1) % 16;
+        }
+    else
+        fprintf(state->file, ", ");
+    fprintf(state->file, "0x%02X", byte);
+    state->row_counter = (state->row_counter + 1) % 16;
 }
 
 void write_string(char *string, FILE *out_file) {
