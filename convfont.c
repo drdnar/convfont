@@ -517,7 +517,7 @@ int main(int argc, char *argv[]) {
         current_font = NULL;
         fonts[0] = NULL;
     }
-    printf("Output size: %i bytes; conversion finished.\n", ftell(out_file));
+    printf("Output size: %li bytes; conversion finished.\n", ftell(out_file));
     fclose(out_file);
 
     return 0;
