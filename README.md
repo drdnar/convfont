@@ -5,8 +5,40 @@ Usage:
 
 `convfont -o <output format> -f <font FNT> [-metrics] [-f <font FNT 2> [-metrics]] <output file name>`
 
-## Font Properties
+The `fontpack` output format supports packing multiple fonts.
+To specify multiple fonts, use `-f <font>` repeatedly for reach input font.
 
+## Font properties
+Font properties are metadata associated with each font that assist in layout and font selection.
+
+All font properties default to zero if left unspecified.
+
+### Space above and below
+Adding additional blank space between lines of text helps improve readability.
+FontLibC can add such blank space automatically based on metadata in the font or programmer request.
+Specifying blank space does not change the byte size of the font, only its layout.
+
+`-a` specifies recommended additional blank space above each line of text.
+
+`-b` specifies recommended additional blank space below.
+
+### Italic space adjust
+`-i` is for italic space adjust, a feature allowing the left side of a glyph to partially overlap the right of the previous glyph.
+
+### Weight
+`-w` specifies the weight of the font.
+This is purely used for font selection and has no direct effect on how the font is displayed.
+See `fontlibc.h` for standard values.
+
+### Style
+`-s` specifies the style of the font.
+This is purely used for font selection and has no direct effect on how the font is displayed.
+See `fontlibc.h` for standard values.
+
+### Cap, x, and baseline height
+`-c`, `-x`, and `-l` specify these values.
+They count lines from the top of the glyph going down.
+Client layout code can use these values to align text from different font families.
 
 
 ## Output formats
