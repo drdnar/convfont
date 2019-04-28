@@ -421,6 +421,7 @@ int main(int argc, char *argv[]) {
 
     if (optind == argc)
         throw_error(bad_options, "Last parameter must be output file name; none was given.");
+    output_file_name = argv[optind];
     if (optind < argc - 1)
         throw_error(bad_options, "Too many trailing parameters.");
     if (current_font == NULL)
@@ -428,7 +429,7 @@ int main(int argc, char *argv[]) {
 
     /* Now write output */
     format_c_array_data_t c_array_data;
-    out_file = fopen(argv[optind], "wb");
+    out_file = fopen(output_file_name, "wb");
     if (!out_file)
         throw_error(bad_outfile, "Cannot open output file.");
     if (output_format == output_fontpack) {
