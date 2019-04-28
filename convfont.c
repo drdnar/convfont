@@ -446,17 +446,17 @@ int main(int argc, char *argv[]) {
             location += MEATADATA_STRUCT_SIZE;
             mdlocation = location;
             if (font_pack_name != NULL)
-                location += strlen(font_pack_name) + 1;
+                location += (int)strlen(font_pack_name) + 1;
             if (author != NULL)
-                location += strlen(author) + 1;
+                location += (int)strlen(author) + 1;
             if (pseudocopyright != NULL)
-                location += strlen(pseudocopyright) + 1;
+                location += (int)strlen(pseudocopyright) + 1;
             if (description != NULL)
-                location += strlen(description) + 1;
+                location += (int)strlen(description) + 1;
             if (version != NULL)
-                location += strlen(version) + 1;
+                location += (int)strlen(version) + 1;
             if (codepage != NULL)
-                location += strlen(codepage) + 1;
+                location += (int)strlen(codepage) + 1;
         }
         /* Font count */
         fputc(fonts_loaded, out_file);
@@ -473,32 +473,32 @@ int main(int argc, char *argv[]) {
             output_ezword(MEATADATA_STRUCT_SIZE, output_format_byte, out_file);
             if (font_pack_name != NULL) {
                 output_ezword(mdlocation, output_format_byte, out_file);
-                mdlocation += strlen(font_pack_name) + 1;
+                mdlocation += (int)strlen(font_pack_name) + 1;
             } else
                 output_ezword(0, output_format_byte, out_file);
             if (author != NULL) {
                 output_ezword(mdlocation, output_format_byte, out_file);
-                mdlocation += strlen(author) + 1;
+                mdlocation += (int)strlen(author) + 1;
             } else
                 output_ezword(0, output_format_byte, out_file);
             if (pseudocopyright != NULL) {
                 output_ezword(mdlocation, output_format_byte, out_file);
-                mdlocation += strlen(pseudocopyright) + 1;
+                mdlocation += (int)strlen(pseudocopyright) + 1;
             } else
                 output_ezword(0, output_format_byte, out_file);
             if (description != NULL) {
                 output_ezword(mdlocation, output_format_byte, out_file);
-                mdlocation += strlen(description) + 1;
+                mdlocation += (int)strlen(description) + 1;
             } else
                 output_ezword(0, output_format_byte, out_file);
             if (version != NULL) {
                 output_ezword(mdlocation, output_format_byte, out_file);
-                mdlocation += strlen(version) + 1;
+                mdlocation += (int)strlen(version) + 1;
             } else
                 output_ezword(0, output_format_byte, out_file);
             if (codepage != NULL) {
                 output_ezword(mdlocation, output_format_byte, out_file);
-                mdlocation += strlen(codepage) + 1;
+                mdlocation += (int)strlen(codepage) + 1;
             } else
                 output_ezword(0, output_format_byte, out_file);
             if (font_pack_name != NULL)
