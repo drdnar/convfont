@@ -192,6 +192,7 @@ fontlib_font_t *parse_fnt(FILE *input, int offset) {
         dfColorPointer = read_word(input);
         if (verbosity >= 3) printf("dfColorPointer: 0x%04X\n", dfColorPointer);
         dfReserved1 = read_word(input);
+        if (verbosity >= 4) printf("dfReserved1: 0x%04X\n", dfReserved1);
         /* I have no idea what these bytes might be. */
         read_word(input);
         read_word(input);
