@@ -323,7 +323,6 @@ int main(int argc, char *argv[]) {
                         throw_error(bad_options, "-w: Number too large or small.");
                 }
                 current_font->weight = (uint8_t)temp_n;
-                printf("Weight: %i\n", temp_n);
                 break;
             case 's':
                 if (current_font == NULL)
