@@ -28,12 +28,18 @@ Specifying blank space does not change the byte size of the font, only its layou
 ### Weight
 `-w` specifies the weight of the font.
 This is purely used for font selection and has no direct effect on how the font is displayed.
-See `fontlibc.h` for standard values.
+You may directly specify a numeric value, optionally using the prefix `0x` for hexadecimal; 
+see `fontlibc.h` for standard values.
+Alternatively, the following names may be used: `thin`, `"extra light"`, `extralight` (synonym for previous), `light`, `semilight`, `normal`, `semibold`, `bold`, `"extra bold"`, `extrabold` (synonym for previous), `black`.
 
 ### Style
 `-s` specifies the style of the font.
 This is purely used for font selection and has no direct effect on how the font is displayed.
-See `fontlibc.h` for standard values.
+You may directly specify a numeric value, optionally using the prefix `0x` for hexadecimal; 
+see `fontlibc.h` for standard values.
+Alternatively, the following names may be used: `sans-serif`, `sansserif` (synonym for previous), `serif`, `upright`, `oblique`, `italic`, `monospaced`, `fixed` (synonym for previous), `proportional`.
+
+If `-s` is specified more than once for the same font, the values are ORed together. For example, you can specify a font as both italic and serif font by doing `-s serif -s italic`.
 
 ### Cap, x, and baseline height
 `-c`, `-x`, and `-l` specify these values.
