@@ -82,6 +82,10 @@ When your calculator program runs, you can use a routine like `fontlib_GetFontBy
 
 #### Font Pack Metadata
 Because font packs are intended to represent a single typeface and allowing users to select a font is an anticipated use case,
-font packs may also contain metadata describing them. Metadata strings should be terse, as they consume limited memory on-calculator.
+font packs may also contain metadata describing them.
+Metadata strings should be terse, as they consume limited memory on-calculator.
+
+The version field is a string, not a number.
+It is not intended to support automatic version control.
 
 Note that the United States does not allow copyrighting bitmapped fonts, though many other jurisdictions do.

@@ -18,8 +18,8 @@
 
 /* http://benoit.papillault.free.fr/c/disc2/exefmt.txt */
 
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 92
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 0
 
 
 /*******************************************************************************
@@ -86,14 +86,6 @@ int check_string_for_value(char *string, string_list_t *possible_values) {
 *                                   ERRORS                                     *
 *******************************************************************************/
 
-bool unix_newline_style =
-#ifdef _WIN32
-false
-#else
-true
-#endif
-;
-
 int verbosity = 0;
 
 void throw_error(const int code, const char *string) {
@@ -107,6 +99,14 @@ void throw_error(const int code, const char *string) {
 /*******************************************************************************
 *                         SOME OUTPUT RELATED STUFF                            *
 *******************************************************************************/
+
+bool unix_newline_style =
+#ifdef _WIN32
+false
+#else
+true
+#endif
+;
 
 void output_format_byte(const uint8_t byte, void *custom_data) {
     fputc(byte, custom_data);
@@ -232,6 +232,7 @@ int main(int argc, char *argv[]) {
     fontlib_font_t *current_font = NULL;
     int temp_n;
     output_formats_t output_format = output_unspecified;
+    size_t strl;
 
     int option;
 
@@ -364,7 +365,9 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-N: Must specify font pack output format.");
                 if (font_pack_name != NULL)
                     throw_error(bad_options, "-N: Duplicate.");
-                if (strlen(optarg) > 255)
+                if ((strl = strlen(optarg)) >= 4096)
+                    throw_error(bad_options, "-N: Way too long a string!");
+                else if (strl > 255)
                     printf("-N: Recommend against such a long string.\n");
                 font_pack_name = optarg;
                 break;
@@ -373,7 +376,9 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-A: Must specify font pack output format.");
                 if (author != NULL)
                     throw_error(bad_options, "-A: Duplicate.");
-                if (strlen(optarg) > 255)
+                if ((strl = strlen(optarg)) >= 4096)
+                    throw_error(bad_options, "-A: Way too long a string!");
+                else if (strl > 255)
                     printf("-A: Recommend against such a long string.  You are not an aristocrat.\n");
                 author = optarg;
                 break; 
@@ -391,7 +396,9 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-D: Must specify font pack output format.");
                 if (description != NULL)
                     throw_error(bad_options, "-D: Duplicate.");
-                if (strlen(optarg) > 255)
+                if ((strl = strlen(optarg)) >= 4096)
+                    throw_error(bad_options, "-D: Way too long a string!");
+                else if (strl > 255)
                     printf("-D: Recommend against such a long string.  (It's called the \"description\" field, not \"dissertation\"!)\n");
                 description = optarg;
                 break;
@@ -400,7 +407,9 @@ int main(int argc, char *argv[]) {
                     throw_error(bad_options, "-V: Must specify font pack output format.");
                 if (version != NULL)
                     throw_error(bad_options, "-V: Duplicate.");
-                if (strlen(optarg) > 255)
+                if ((strl = strlen(optarg)) >= 4096)
+                    throw_error(bad_options, "-V: Way too long a string!");
+                else if (strl > 255)
                     printf("-V: Recommend against such a long string.  (It's called the version field, not the changelog!)\n");
                 version = optarg;
                 break;
