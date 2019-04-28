@@ -18,6 +18,74 @@
 
 /* http://benoit.papillault.free.fr/c/disc2/exefmt.txt */
 
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 92
+
+
+/*******************************************************************************
+*                             STYLES AND WEIGHTS                               *
+*******************************************************************************/
+
+typedef struct {
+    char* string;
+    uint8_t value;
+} string_value_pair_t;
+
+typedef struct {
+    int count;
+    string_value_pair_t *strings;
+} string_list_t;
+
+string_value_pair_t weight_names[] = {
+    { "thin", 0x20 },
+    { "extra light", 0x30 },
+    { "extralight", 0x30 },
+    { "light", 0x40 },
+    { "semilight", 0x60 },
+    { "normal", 0x80 },
+    { "medium", 0x90 },
+    { "semibold", 0xA0 },
+    { "bold", 0xC0 },
+    { "extra bold", 0xE0 },
+    { "extrabold", 0xE0 },
+    { "black", 0xF0 }
+};
+
+string_list_t weights = {
+    .count = 12,.strings = weight_names
+};
+
+string_value_pair_t style_names[] = {
+    { "sans-serif", 0 },
+    { "sansserif", 0 },
+    { "serif", 1 },
+    { "upright", 0 },
+    { "oblique", 2 },
+    { "italic", 4 },
+    { "monospaced", 8 },
+    { "fixed", 8 },
+    { "proportional", 0 }
+};
+
+string_list_t styles = {
+    9, style_names
+};
+
+/* Compares a string against a list of strings and numeric values to associate
+with that string.  Returns -1 if no match is found. */
+int check_string_for_value(char *string, string_list_t *possible_values) { 
+    for (int i = 0; i < possible_values->count; i++)
+        if (!strcmp(string, possible_values->strings[i].string))
+            return possible_values->strings[i].value;
+    return -1;
+}
+
+
+
+/*******************************************************************************
+*                                   ERRORS                                     *
+*******************************************************************************/
+
 bool unix_newline_style =
 #ifdef _WIN32
 false
@@ -26,9 +94,6 @@ true
 #endif
 ;
 
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 91
-
 int verbosity = 0;
 
 void throw_error(const int code, const char *string) {
@@ -36,6 +101,12 @@ void throw_error(const int code, const char *string) {
         fprintf(stderr, "ERROR: %s\n", string);
     exit(code);
 }
+
+
+
+/*******************************************************************************
+*                         SOME OUTPUT RELATED STUFF                            *
+*******************************************************************************/
 
 void output_format_byte(const uint8_t byte, void *custom_data) {
     fputc(byte, custom_data);
@@ -74,6 +145,12 @@ void write_string(char *string, FILE *out_file) {
     while (*string++ != '\0');
 }
 
+
+
+/*******************************************************************************
+*                                    HELP                                      *
+*******************************************************************************/
+
 void show_help(char *name) {
     printf("\nUsage:\n"
 	"\t%s -o <output format> -f <font FNT> [-metrics] [-f <font FNT 2> [-metrics]] <output file name>\n"
@@ -96,7 +173,11 @@ void show_help(char *name) {
         "\t-b: <n> space Below\n"
         "\t-i: <n> Italic space adjust\n"
         "\t-w: <n> Weight\n"
+        "\t    The following strings may also be used:\n"
+        "\t        thin, extralight, light, semilight, normal, medium, semibold, bold, extrabold, black\n"
         "\t-s: <n> Style\n"
+        "\t    The following strings may also be used:\n"
+        "\t        sans-serif, serif, upright, oblique, italic, monospaced, proportional\n"
         "\t-c: <n> Cap height\n"
         "\t-x: <n> x height\n"
         "\t-l: <n> baseLine height\n"
@@ -235,18 +316,25 @@ int main(int argc, char *argv[]) {
             case 'w':
                 if (current_font == NULL)
                     throw_error(bad_options, "-w: Must specify a font before specifying metrics.");
-                temp_n = (int)strtol(optarg, NULL, 0);
-                if (temp_n > 255 || temp_n < 0)
-                    throw_error(bad_options, "-w: Number too large or small.");
+                temp_n = check_string_for_value(optarg, &weights);
+                if (temp_n == -1) {
+                    temp_n = (int)strtol(optarg, NULL, 0);
+                    if (temp_n > 255 || temp_n < 0)
+                        throw_error(bad_options, "-w: Number too large or small.");
+                }
                 current_font->weight = (uint8_t)temp_n;
+                printf("Weight: %i\n", temp_n);
                 break;
             case 's':
                 if (current_font == NULL)
                     throw_error(bad_options, "-s: Must specify a font before specifying metrics.");
-                temp_n = (int)strtol(optarg, NULL, 0);
-                if (temp_n > 255 || temp_n < 0)
-                    throw_error(bad_options, "-s: Number too large or small.");
-                current_font->style = (uint8_t)temp_n;
+                temp_n = check_string_for_value(optarg, &styles);
+                if (temp_n == -1) {
+                    temp_n = (int)strtol(optarg, NULL, 0);
+                    if (temp_n > 255 || temp_n < 0)
+                        throw_error(bad_options, "-s: Number too large or small.");
+                }
+                current_font->style |= (uint8_t)temp_n;
                 break;
             case 'c':
                 if (current_font == NULL)
@@ -509,6 +597,9 @@ int main(int argc, char *argv[]) {
             case output_binary_blob:
                 serialize_font(current_font, output_format_byte, out_file);
                 break;
+            case output_unspecified:
+                throw_error(internal_error, "-o: No output format specified.");
+                break;
             default:
                 throw_error(internal_error, "-o: Someone attempted to add a new output format without actually coding it.");
                 break;
@@ -517,7 +608,7 @@ int main(int argc, char *argv[]) {
         current_font = NULL;
         fonts[0] = NULL;
     }
-    printf("Output size: %i bytes; conversion finished.\n", ftell(out_file));
+    printf("Output size: %li bytes; conversion finished.\n", ftell(out_file));
     fclose(out_file);
 
     return 0;
