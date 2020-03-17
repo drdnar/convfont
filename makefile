@@ -8,11 +8,12 @@ DEPS = convfont.h parse_fnt.h serialize_font.h
 OBJ = convfont.o parse_fnt.o serialize_font.o
 
 ifeq ($(OS),Windows_NT)
-RM = del /f /q 2>nul
+RM = del /f $1 2>nul
 EXECUTABLE = convfont.exe
+SHELL = cmd.exe
 else
 EXECUTABLE = convfont
-RM = rm -f
+RM = rm -rf $1
 endif
 
 all: $(EXECUTABLE)
@@ -26,4 +27,5 @@ $(EXECUTABLE): $(OBJ)
 .PHONY: clean
 
 clean:
-	$(RM) *.o $(EXECUTABLE)
+	$(call RM,*.o $(EXECUTABLE))
+

@@ -8,3 +8,4 @@ convfont
 /convfont.VC.VC.opendb
 /convfont.VC.db
 *.o
+*.exe
