@@ -608,7 +608,7 @@ int main(int argc, char *argv[]) {
                 serialize_font(current_font, output_format_byte, out_file);
                 break;
             case output_unspecified:
-                throw_error(internal_error, "-o: No output format specified.");
+                throw_error(bad_options, "-o: No output format specified.");
                 break;
             default:
                 throw_error(internal_error, "-o: Someone attempted to add a new output format without actually coding it.");
