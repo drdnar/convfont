@@ -19,7 +19,7 @@
 /* http://benoit.papillault.free.fr/c/disc2/exefmt.txt */
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 0
+#define VERSION_MINOR 1
 
 
 /*******************************************************************************
@@ -538,6 +538,7 @@ int main(int argc, char *argv[]) {
                 c_array_data.row_counter = 0;
                 c_array_data.first_line = true;
                 serialize_font(current_font, output_format_c_array, &c_array_data);
+                print_newline(out_file);
                 break;
             case output_asm_array:
                 fprintf(out_file, ".header:"); print_newline(out_file);
