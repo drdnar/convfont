@@ -1,0 +1,38 @@
+ifeq (@(TUP_PLATFORM),win32)
+  EXE = .exe
+else
+  GETOPT = system
+endif
+
+CC = gcc
+ifdef CC
+  CC = @(CC)
+endif
+
+CFLAGS += -Wall
+ifdef CFLAGS
+  CFLAGS = @(CFLAGS)
+endif
+
+LD = $(CC)
+ifdef LD
+  LD = @(LD)
+endif
+
+ifdef LDFLAGS
+  LDFLAGS = @(LDFLAGS)
+endif
+
+ifdef GETOPT
+  GETOPT = @(GETOPT)
+endif
+
+SRCS += convfont.c
+SRCS += parse_fnt.c
+SRCS += serialize_font.c
+ifneq ($(GETOPT),system)
+  SRCS += getopt.c
+endif
+
+: foreach $(SRCS) |> ^ CC %o^ $(CC) $(CFLAGS) -c %f -o %o |> %B.o {OBJ}
+: {OBJ} |> ^ LD %o^ $(LD) $(LDFLAGS) %f -o %o |> convfont$(EXE)
