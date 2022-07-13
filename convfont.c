@@ -14,27 +14,18 @@
 #endif
 #include "convfont.h"
 #include "parse_fnt.h"
+#include "parse_text.h"
 #include "serialize_font.h"
 
 /* http://benoit.papillault.free.fr/c/disc2/exefmt.txt */
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 1
+#define VERSION_MINOR 2
 
 
 /*******************************************************************************
 *                             STYLES AND WEIGHTS                               *
 *******************************************************************************/
-
-typedef struct {
-    char* string;
-    uint8_t value;
-} string_value_pair_t;
-
-typedef struct {
-    int count;
-    string_value_pair_t *strings;
-} string_list_t;
 
 string_value_pair_t weight_names[] = {
     { "thin", 0x20 },
@@ -75,11 +66,17 @@ string_list_t styles = {
 with that string.  Returns -1 if no match is found. */
 int check_string_for_value(char *string, string_list_t *possible_values) { 
     for (int i = 0; i < possible_values->count; i++)
-        if (!strcmp(string, possible_values->strings[i].string))
+        if (strcaseeq(string, possible_values->strings[i].string))
             return possible_values->strings[i].value;
     return -1;
 }
 
+bool strcaseeq(const char *str1, const char *str2) {
+    for (; *str1 != '\0' && *str2 != '\0'; str1++, str2++)
+        if (tolower(*str1) != tolower(*str2))
+            return false;
+    return true;
+}
 
 
 /*******************************************************************************
@@ -88,9 +85,27 @@ int check_string_for_value(char *string, string_list_t *possible_values) {
 
 int verbosity = 0;
 
-void throw_error(const int code, const char *string) {
+noreturn void throw_error(const int code, const char *string) {
     if (string != NULL)
-        fprintf(stderr, "ERROR: %s\n", string);
+        throw_errorf(code, "%s", string);
+    exit(code);
+}
+
+
+noreturn void throw_errorf(const int code, const char *string, ...) {
+    va_list argp;
+    va_start(argp, string);
+    vthrow_errorf(code, string, argp);
+    va_end(argp);
+}
+
+
+noreturn void vthrow_errorf(const int code, const char *string, va_list args) {
+    if (string != NULL) {
+        fprintf(stderr, "ERROR: ");
+        vfprintf(stderr, string, args);
+        fprintf(stderr, "\n");
+    }
     exit(code);
 }
 
@@ -169,6 +184,7 @@ void show_help(char *name) {
 #endif
         "\nIndividual font properties:\n"
         "\t-f: <file name> input Font\n"
+        "\t-t: <file name> input Text-format font\n"
         "\t-a: <n> space Above\n"
         "\t-b: <n> space Below\n"
         "\t-i: <n> Italic space adjust\n"
@@ -236,7 +252,7 @@ int main(int argc, char *argv[]) {
 
     int option;
 
-    while ((option = getopt(argc, argv, "hvo:Zf:a:b:i:w:s:c:x:l:N:A:C:D:V:P:")) != -1) {
+    while ((option = getopt(argc, argv, "hvo:Zf:a:b:i:w:s:c:x:l:N:A:C:D:V:P:t:")) != -1) {
         switch (option) {
             case 'h':
                 show_help(argv[0]);
@@ -290,6 +306,23 @@ int main(int argc, char *argv[]) {
                 fclose(in_file);
                 fonts[fonts_loaded++] = current_font;
                 break;
+            case 't':
+                if (fonts_loaded > 0 && output_format != output_fontpack)
+                    throw_error(bad_options, "-f: Cannot have multiple input fonts unless -o fontpack is specified first.");
+                if (fonts_loaded >= MAX_FONTS - 1)
+                    throw_error(bad_options, "-f: Too many fonts.  What on Earth makes you think your font pack needs so many fonts?");
+                recent_input_file_name = optarg;
+                if (verbosity >= 1)
+                    printf("Processing input file %s . . .\n", recent_input_file_name);
+                in_file = fopen(recent_input_file_name, "r");
+                if (!in_file)
+                    throw_error(bad_infile, "-f: Cannot open input file.");
+                
+                current_font = parse_text(in_file, 0);
+                fclose(in_file);
+                fonts[fonts_loaded++] = current_font;
+                break;
+
             case 'a':
                 if (current_font == NULL)
                     throw_error(bad_options, "-a: Must specify a font before specifying metrics.");

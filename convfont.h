@@ -3,6 +3,17 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
+
+#ifdef _MSC_VER
+#define noreturn __declspec(noreturn)
+#else
+#ifdef __GNUC__
+#define noreturn __attribute__((noreturn))
+#else
+#define noreturn _Noreturn
+#endif
+#endif
 
 #define MAX_APPVAR_SIZE 0xFFE8
 #define MEATADATA_STRUCT_SIZE 21
@@ -24,6 +35,7 @@ typedef enum {
     bad_options,
     malloc_failed,
     internal_error,
+    text_parser_error,
 } error_codes_t;
 
 /* This definition just adds some typing to otherwise opaque chunks of data. */
@@ -80,4 +92,54 @@ return ((width - 1) >> 3) + 1;
  * row for a glyph. */
 #define byte_columns(width) ((((width) - 1) >> 3) + 1)
 
-void throw_error(const int code, const char *string);
+/**
+ * Displays an error and exits.
+ */
+noreturn void throw_error(const int code, const char *string);
+
+/**
+* Displays an error and exits.
+*/
+noreturn void throw_errorf(const int code, const char *string, ...);
+
+/**
+* Displays an error and exits.
+*/
+noreturn void vthrow_errorf(const int code, const char *string, va_list args);
+
+
+
+/*******************************************************************************
+*                             STYLES AND WEIGHTS                               *
+*******************************************************************************/
+
+typedef struct {
+    char* string;
+    uint8_t value;
+} string_value_pair_t;
+
+typedef struct {
+    int count;
+    string_value_pair_t *strings;
+} string_list_t;
+
+/**
+ * Compares a string against a list of strings and numeric values to associate
+ * with that string.  Returns -1 if no match is found.
+ */
+int check_string_for_value(char *string, string_list_t *possible_values);
+
+/**
+ * Compares two strings, ignoring case.
+ */
+bool strcaseeq(const char *str1, const char *str2);
+
+/**
+ * List of names of styles.
+ */
+extern string_list_t styles;
+
+/**
+* List of names of weights.
+*/
+extern string_list_t weights;

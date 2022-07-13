@@ -152,12 +152,14 @@
     <ClInclude Include="convfont.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="parse_fnt.h" />
+    <ClInclude Include="parse_text.h" />
     <ClInclude Include="serialize_font.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="convfont.c" />
     <ClCompile Include="getopt.c" />
     <ClCompile Include="parse_fnt.c" />
+    <ClCompile Include="parse_text.c" />
     <ClCompile Include="serialize_font.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
