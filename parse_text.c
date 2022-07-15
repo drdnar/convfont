@@ -10,7 +10,8 @@
 #include "parse_text.h"
 
 enum {
-    UNKNOWN_FONT_TAG,
+    IGNORED_FONT_TAG,
+    FORCE_EIGHT_BIT,
     STYLE,
     HEIGHT,
     WEIGHT,
@@ -23,11 +24,25 @@ enum {
     DOUBLE_WIDTH_DEFAULT,
     DEFAULT_WIDTH,
     FIXED_WIDTH,
+    INVERTED_MODE,
     GLYPH_DATA,
 };
 
-const string_value_pair_t font_tag_names[] =
+string_value_pair_t font_tag_names[] =
 {
+    { "name", IGNORED_FONT_TAG },
+    { "description", IGNORED_FONT_TAG },
+    { "code page", IGNORED_FONT_TAG },
+    { "codepage", IGNORED_FONT_TAG },
+    { "copyright", IGNORED_FONT_TAG },
+    { "date", IGNORED_FONT_TAG },
+    { "8bit", FORCE_EIGHT_BIT },
+    { "8-bit", FORCE_EIGHT_BIT },
+    { "8 bit", FORCE_EIGHT_BIT },
+    { "force 8-bit", FORCE_EIGHT_BIT },
+    { "force 8 bit", FORCE_EIGHT_BIT },
+    { "eight-bit", FORCE_EIGHT_BIT },
+    { "eight bit", FORCE_EIGHT_BIT },
     { "height", HEIGHT },
     { "weight", WEIGHT },
     { "style", STYLE },
@@ -69,6 +84,8 @@ const string_value_pair_t font_tag_names[] =
     { "fixedwidth", FIXED_WIDTH },
     { "fixed width", FIXED_WIDTH },
     { "fixed_width", FIXED_WIDTH },
+    { "invert", INVERTED_MODE },
+    { "inverted", INVERTED_MODE },
     { "glyphs", GLYPH_DATA },
     { "characters", GLYPH_DATA },
     { "bitmaps", GLYPH_DATA },
@@ -81,15 +98,18 @@ const string_list_t font_tags = {
 };
 
 enum {
-    UNKNOWN_GLYPH_TAG,
+    IGNORED_GLYPH_TAG,
     CODEPOINT,
     DOUBLE_WIDTH,
     WIDTH,
+    INVERTED,
     DATA,
 };
 
-const string_value_pair_t glyph_tag_names[] =
+string_value_pair_t glyph_tag_names[] =
 {
+    { "name", IGNORED_GLYPH_TAG },
+    { "unicode", IGNORED_GLYPH_TAG },
     { "double", DOUBLE_WIDTH },
     { "doublewidth", DOUBLE_WIDTH },
     { "double width", DOUBLE_WIDTH },
@@ -99,6 +119,8 @@ const string_value_pair_t glyph_tag_names[] =
     { "index", CODEPOINT },
     { "code", CODEPOINT },
     { "width", WIDTH },
+    { "invert", INVERTED },
+    { "inverted", INVERTED },
     { "data", DATA },
     { "image", DATA },
     { "bitmap", DATA },
@@ -108,7 +130,7 @@ const string_list_t glyph_tags = {
     sizeof(glyph_tag_names) / sizeof(string_value_pair_t), glyph_tag_names
 };
 
-const string_value_pair_t bool_names[] =
+string_value_pair_t bool_names[] =
 {
     { "false", 0 },
     { "no", 0 },
@@ -133,9 +155,6 @@ const string_list_t bools = {
 };
 
 
-
-/******************************************************************************/
-
 #define MAX_LINE_LENGTH 256
 #define ENCODING_ERROR          -11001
 #define ENCODING_CONFLICT       -11002
@@ -149,8 +168,8 @@ const string_list_t bools = {
 #define WIDTH_CONFLICT			-11010
 
 /**
-* Current state of newline processing.
-*/
+ * Current state of newline processing.
+ */
 enum {
     IN_LINE,
     CR,
@@ -158,8 +177,8 @@ enum {
 };
 
 /**
-* Encoding types
-*/
+ * Encoding types
+ */
 enum {
     UNKNOWN, /**< Not sure how to deal with high-bit-set codes. */
     ASCII, /**< Force 8-bit code processing. */
@@ -169,8 +188,8 @@ enum {
 };
 
 /**
-* UTF-16 state
-*/
+ * UTF-16 state
+ */
 enum {
     START, /**< Expecting the start of a potential surrogate pair. */
     NEXT, /**< Expecting the continuation of a surrogate pair. */
@@ -183,12 +202,13 @@ enum {
 typedef struct parser_state {
     FILE *file;
     /**
-    * Tells get_next_char whether and how to parse multibyte codes.
-    */
+     * Tells get_next_char whether and how to parse multibyte codes.
+     */
     char encoding;
+    bool bom_found;
     /**
-    * For UTF-16 coding, this holds the state of the surrogate pair parser.
-    */
+     * For UTF-16 coding, this holds the state of the surrogate pair parser.
+     */
     char expecting;
     int line_number;
     int line_pos;
@@ -197,7 +217,10 @@ typedef struct parser_state {
 } parser_state_t;
 
 
-#define ERROR(X) do { throw_errorf(text_parser_error, "Line %i: %s", state->line_number, X); } while (false)
+
+/******************************************************************************/
+
+#define ERROR(X) throw_errorf(text_parser_error, "Line %i: %s", state->line_number, X)
 
 #define NEXT_RAW(X) do { if ((X = fgetc(state->file)) < 0) return X; } while (false)
 #define NEXT_RAW_THROW(X, Y) do { if ((X = fgetc(state->file)) < 0) ERROR(Y); } while (false)
@@ -206,9 +229,9 @@ typedef struct parser_state {
 
 
 /**
-* Gets the next codepoint.
-* @return int Negative on failure.
-*/
+ * Gets the next codepoint.
+ * @return int Negative on failure.
+ */
 static int get_next_char(parser_state_t *state) {
     long int c, c2;
     NEXT_RAW(c);
@@ -217,7 +240,7 @@ static int get_next_char(parser_state_t *state) {
             state->expecting = START;
             return c;
         }
-        NEXT_RAW_THROW(c2, "Failed to get second byte of UTF-16 pair.");
+        NEXT_RAW_THROW(c2, "UTF-16 decoder: Failed to get second byte of UTF-16 pair.");
         if (state->encoding == UTF16BE)
             c = (c << 8) | c2;
         else
@@ -225,26 +248,26 @@ static int get_next_char(parser_state_t *state) {
         /* Consume surrogate pair if needed */
         if (c >= 0xD800 && c < 0xDC00) {
             if (state->expecting == NEXT)
-                ERROR("Two first halves of surrogate pair.");
+                ERROR("UTF-16 decoder: Two first halves of surrogate pair.");
             state->expecting = NEXT;
             c2 = get_next_char(state);
             state->expecting = START;
             if (c2 < 0)
-                return c2;
+                ERROR("UTF-16 decoder: Failed to get second half of surrogate pair.");
             c = 0x10000 + ((c2 & 0x3FF) | ((c & 0x3FF) << 10));
             /* Encoding a surrogate pair with a surrogate pair? */
             if (c >= 0xD800 && c < 0xE000)
-                ERROR("Surrogate pair encoded with surrogate pair.");
+                ERROR("UTF-16 decoder: Surrogate pair encoded with surrogate pair.");
         } else if (c >= 0xDC00 && c < 0xE000) {
             if (state->expecting == START)
-                ERROR("Unexpected second half of surrogate pair.");
+                ERROR("UTF-16 decoder: Unexpected second half of surrogate pair.");
         } else if (state->expecting == NEXT)
-            ERROR("Expected second half of surrogate pair.");
+            ERROR("UTF-16 decoder: Expected second half of surrogate pair.");
     } else if (state->encoding == UTF8) {
         if (c == 0)
             ERROR("Null in input text.");
         if (c >= 0xF5)
-            ERROR("Invalid UTF-8 byte >= 0xF5.");
+            ERROR("UTF-8 decoder: Invalid byte >= 0xF5.");
         /* Read multibyte sequence */
         if (c >= 0xC2) {
             int required_bytes;
@@ -258,16 +281,17 @@ static int get_next_char(parser_state_t *state) {
                 c &= 0x1F;
                 required_bytes = 1;
             } else if (c >= 0x80)
-                ERROR("Invalid UTF-8 byte.");
-            while (required_bytes--> 0) {
-                NEXT_RAW_THROW(c2, "Failed to get subsequent bytes of UTF-8 multibyte sequence.");
+                ERROR("UTF-8 decoder: Invalid byte.");
+            while (required_bytes --> 0) {
+                NEXT_RAW_THROW(c2, "UTF-8 decoder: Failed to get subsequent byte(s) of multibyte sequence.");
                 if (c2 < 0x80 || c2 >= 0xC0)
-                    ERROR("Expected subsequent UTF-8 byte.");
+                    ERROR("UTF-8 decoder: Expected subsequent byte.");
                 c = (c << 6) | (c2 & 0x3F);
             }
             if (c >= 0xD800 && c < 0xE000)
-                ERROR("Surrogate pair encoded in UTF-8.");
-        }
+                ERROR("UTF-8 decoder: Surrogate pair encoded.");
+        } else if (c >= 0x80)
+            ERROR("UTF-8 decoder: Continuation byte(s) without leading byte.");
     }
     if (c == 0)
         ERROR("Null in input text.");
@@ -279,8 +303,8 @@ static int get_next_char(parser_state_t *state) {
 
 
 /**
-* Returns a codepoint to the read buffer.
-*/
+ * Returns a codepoint to the read buffer.
+ */
 static void unget(int c, parser_state_t *state) {
     state->expecting = UNGOT;
     ungetc(c, state->file);
@@ -288,11 +312,11 @@ static void unget(int c, parser_state_t *state) {
 
 
 /**
-* Gets the next codepoint, and parses newlines.
-* \r\n is collated into a single \n, and \r is also converted into \n.
-* Unicode spaces are converted into simple spaces, and zero-width characters are skipped.
-* @return int Negative on failure.
-*/
+ * Gets the next codepoint, and parses newlines.
+ * \r\n is collated into a single \n, and \r is also converted into \n.
+ * Unicode spaces are converted into simple spaces, and zero-width characters are skipped.
+ * @return int Negative on failure.
+ */
 static int get_next(parser_state_t *state) {
     int c;
 read_again:
@@ -331,6 +355,8 @@ read_again:
             case 0xFEFF: /* Zero width non-breaking space or Byte order mark */
                 goto read_again;
         }
+        if (c >= 0x300 && c < 0x370) /* Combining diacritical marks */
+            goto read_again;
     }
     if (c == '\n')
         return c;
@@ -344,21 +370,23 @@ read_again:
 
 
 /**
-* Initialize file parsing.
-*
-* @param state Pointer to state object
-* @param file FILE to use for input
-* @param encoding
-*/
+ * Initialize file parsing.
+ *
+ * @param state Pointer to state object
+ * @param file FILE to use for input
+ * @param encoding
+ */
 static void init_parser(parser_state_t *state, FILE *file, char encoding) {
     state->file = file;
     state->expecting = START;
     state->encoding = encoding;
     state->line_number = 1;
+    state->bom_found = false;
     int c, c2;
     NEXT_RAW_THROW(c, "Out of bytes in header.");
     NEXT_RAW_THROW(c2, "Out of bytes in header.");
     if (c >= 0xFE) {
+        /* Detect UTF-16 with BOM. */
         if (c == 0xFE && c2 == 0xFF)
             if (encoding == UTF16BE || encoding == UNKNOWN)
                 state->encoding = UTF16BE;
@@ -371,56 +399,64 @@ static void init_parser(parser_state_t *state, FILE *file, char encoding) {
                 ERROR("Requested encoding conflicts with BOM detected.");
         else
             ERROR("BOM-like bytes not valid.");
-        if (get_next_char(state) != 'c')
-            ERROR("File does not start with \'convfont\'.");
+        NEXT_THROW(c2, "Out of bytes in header.");
+        if (tolower(c2) != 'c')
+            ERROR("File does not start with \"convfont\".");
     } else if (c == 0xEF) {
+        /* Detect UTF-8 with BOM. */
         if (c2 != 0xBB)
-            ERROR("File does not start with \'convfont\'.");
-        if ((c2 = fgetc(state->file)) < 0)
-            ERROR("Out of bytes in header.");
+            ERROR("File does not start with \"convfont\".");
+        NEXT_RAW_THROW(c2, "Out of bytes in header.");
         if (c2 != 0xBF)
-            ERROR("File does not start with \'convfont\'.");
+            ERROR("File does not start with \"convfont\".");
         if (encoding == UTF8 || encoding == UNKNOWN)
             state->encoding = UTF8;
         else
-            ERROR("File starts with UTF-8 BOM, but requested different encoding.");
+            ERROR("File starts with UTF-8 BOM, but different encoding requested.");
+        NEXT_THROW(c2, "Out of bytes in header.");
+        if (tolower(c2) != 'c')
+            ERROR("File does not start with \"convfont\".");
+        state->bom_found = true;
     } else {
-        if (c == 'c' && c2 == '\0')
+        /* Detect UTF-16 without BOM. */
+        if (tolower(c) == 'c' && c2 == '\0')
             if (encoding == UTF16LE || encoding == UNKNOWN)
                 state->encoding = UTF16LE;
             else
-                ERROR("File does not start with \'convfont\'.");
-        else if (c == '\0' && c2 == 'c')
+                ERROR("File does not start with \"convfont\".");
+        else if (c == '\0' && tolower(c2) == 'c')
             if (encoding == UTF16BE || encoding == UNKNOWN)
                 state->encoding = UTF16BE;
             else
-                ERROR("File does not start with \'convfont\'.");
-        else if (c == 'c') {
+                ERROR("File does not start with \"convfont\".");
+        else if (tolower(c) == 'c') {
+            /* Assume UTF-8. */
             if (encoding != UNKNOWN)
                 state->encoding = UTF8;
             ungetc(c2, state->file);
         } else
-            ERROR("File does not start with \'convfont\'.");
+            ERROR("File does not start with \"convfont\".");
     }
+    /* Detect rest of header. */
     char eader[] = "onvfont";
     for (int i = 0; i < strlen(eader); i++) {
         NEXT_THROW(c, "Out of bytes in header.");
-        if (eader[i] != c)
-            ERROR("File does not start with \'convfont\'.");
+        if (eader[i] != tolower(c))
+            ERROR("File does not start with \"convfont\".");
     }
     if (get_next(state) != '\n')
-        ERROR("File does not start with \'convfont\' and newline.");
+        ERROR("File does not start with \"convfont\" and newline.");
     if (state->encoding == UNKNOWN)
         state->encoding = UTF8;
 }
 
 
 /**
-* Buffers the next line of text.
-* @return int >= 0 on success, negative on failure.
-* Returns LINE_TOO_LONG if the line is too long, and eats the rest of the line.
-* Returns EOF if no characters can be read because the file is done.
-*/
+ * Buffers the next line of text.
+ * @return int >= 0 on success, negative on failure.
+ * Returns LINE_TOO_LONG if the line is too long, and eats the rest of the line.
+ * Returns EOF if no characters can be read because the file is done.
+ */
 static int get_next_line(parser_state_t *state) {
     int c;
     int len = MAX_LINE_LENGTH;
@@ -430,22 +466,25 @@ static int get_next_line(parser_state_t *state) {
     char* buffer = state->line;
     do {
         if (--len <= 0) {
+            /* Ignore rest of overlong line. */
             *buffer = '\0';
             while (c != '\n' && c > 0)
                 c = get_next(state);
             return LINE_TOO_LONG;
         }
         if ((c = get_next(state)) < 0) {
+            /* Error. */
             *buffer = '\0';
             if (state->line_len < 1)
                 return c;
             return 0;
         }
+        /* Process newline. */
         if (c == '\n') {
             *buffer = '\0';
             return 0;
         }
-        if (c > 0xFF)
+        if (c > 0xFF) /* De-Unicode. */
             c = 0xFF;
         state->line_len++;
         *buffer++ = (char)c;
@@ -454,18 +493,18 @@ static int get_next_line(parser_state_t *state) {
 
 
 /**
-* Check if a character is whitespace.
-*/
+ * Check if a character is whitespace.
+ */
 static bool is_whitespace(char ch) {
     return ch == ' ' || ch == '\t';
 }
 
 
 /**
-* Skips over a bunch of whitespace.
-*
-* @return Pointer to first non-whitespace character.
-*/
+ * Skips over a bunch of whitespace.
+ *
+ * @return Pointer to first non-whitespace character.
+ */
 static char *eat_whitespace(char *str) {
     while (is_whitespace(*str))
         str++;
@@ -474,15 +513,15 @@ static char *eat_whitespace(char *str) {
 
 
 /**
-* Extracts a tag or data field from a line of text.
-*
-* @param input_string Pointer to input string
-* @param mode False if looking for a tag (terminated with :), true if looking for value.
-* @param output Pointer to output string.  This will be become NULL terminated.
-* @param max_len Size of output string buffer.
-* @return int Number of characters consumed.  Negative value on error.
-* EOF means input ended before ':'.  LINE_TOO_LONG means out of output space.
-*/
+ * Extracts a tag or data field from a line of text.
+ *
+ * @param input_string Pointer to input string
+ * @param mode False if looking for a tag (terminated with :), true if looking for value.
+ * @param output Pointer to output string.  This will be become NULL terminated.
+ * @param max_len Size of output string buffer.
+ * @return int Number of characters consumed.  Negative value on error.
+ * EOF means input ended before ':'.  LINE_TOO_LONG means out of output space.
+ */
 static int extract_field(char *input_string, bool mode, char *output, int max_len) {
     if (max_len <= 0) /* ? ? ? */
         throw_error(internal_error, "extract_field: max_len <= 0");
@@ -548,9 +587,9 @@ static char dehexify(char x) {
 
 
 /**
-* Extracts some kind of number-like thing, mostly following C-like rules.
-* Negative values are not allowed.
-*/
+ * Extracts some kind of number-like thing, mostly following C-like rules.
+ * Negative values are not allowed.
+ */
 static int get_number(parser_state_t *state, char **str) {
     char *string = eat_whitespace(*str);
     char c = *string;
@@ -663,8 +702,8 @@ typedef struct {
      */
     uint32_t bitmap;
     /**
-     * Number of pixels actually read into bitmap field.
-     */
+      * Number of pixels actually read into bitmap field.
+      */
     uint_fast8_t width;
 } bitmap_line_t;
 
@@ -673,7 +712,6 @@ typedef struct {
  */
 static bitmap_line_t prase_bitmap(char *text, bool double_width) {
     bitmap_line_t line = { 0, 0 };
-    int width = 0;
     uint32_t bit = 0x80000000;
     for (char c = *text++; c != '\0'; c = *text++) {
         if (c != '0' && c != ' ')
@@ -684,20 +722,6 @@ static bitmap_line_t prase_bitmap(char *text, bool double_width) {
             break;
     }
     return line;
-}
-
-
-/**
- * Displays a bitmap.
- */
-static void print_bitmap(uint32_t bitmap, int width) {
-    while (width--> 0) {
-        if (bitmap & 0x80000000)
-            printf("1");
-        else
-            printf("0");
-        bitmap <<= 1;
-    }
 }
 
 
@@ -727,7 +751,7 @@ static void is_error(parser_state_t *state, int val) {
             ERROR("Conflicting width data.");
             break;
         default:
-            throw_error(internal_error, "Unhandled error code.");
+            throw_errorf(internal_error, "Unhandled error code %i on line %i.", -val, state->line_number);
             break;
     }
 }
@@ -759,9 +783,9 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
     /**
      * Cache of glyph bitmap prior to being properly serialized.
      */
-    static uint32_t glyph_data[32];
+    static uint32_t glyph_data[256];
     /**
-     * Width of glyph currently being read.
+     * Physical width of glyph currently being read.
      */
     int glyph_width;
     char tag[MAX_LINE_LENGTH];
@@ -769,12 +793,15 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
     char *str;
     int tag_length;
     int line;
+    bool forced_8_bit = false;
     bool default_double_width = false;
     bool double_width;
+    uint8_t default_inverted = false;
+    uint8_t inverted = 0;
     bool fixed_width = false;
     int default_width = -1;
     /**
-     *
+     * Final detected width.
      */
     int width = -1;
     int height = -1;
@@ -798,13 +825,16 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
      * First glyph number defined.
      */
     int first_glyph = 256;
-    
     /**
      * Result
      */
     int r;
+
     init_parser(state, in_file, encoding);
+    
+    /* Process header/metadata. */
     do {
+        /* Read a line and ingore empty lines and whitespace. */
         r = get_next_line(state);
         if (r == LINE_TOO_LONG && *eat_whitespace(state->line) == ':')
             continue;
@@ -812,6 +842,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         r = *eat_whitespace(state->line);
         if (r == ':' || r == '\0')
             continue;
+        /* Figure out what's happening on this line. */
         tag_length = extract_field(state->line, false, tag, MAX_LINE_LENGTH);
         if (tag_length == EOF)
             ERROR("Tag expected.");
@@ -820,16 +851,36 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         CHECK_FOR_ERROR(r);
         r = check_string_for_value(tag, &font_tags);
         if (r < 0)
-            continue;
+            ERROR("Unrecognized tag.");
         if (r == GLYPH_DATA)
             break;
         switch (r) {
+            case IGNORED_FONT_TAG:
+                /* Do nothing. */
+                break;
+            case FORCE_EIGHT_BIT:
+                if (forced_8_bit)
+                    ERROR("Duplicate specifier of 8-bit encoding mode.");
+                r = check_string_for_value(val, &bools);
+                if (r < 0)
+                    ERROR("Invalid boolean.");
+                forced_8_bit = true;
+                if (r) {
+                    if (state->encoding == UTF16BE || state->encoding == UTF16LE)
+                        ERROR("Detected UTF-16 encoding, but 8-bit encoding requested.");
+                    if (state->encoding == UTF8 && state->bom_found)
+                        ERROR("Detected UTF-8 encoding, but 8-bit encoding requested.");
+                    state->encoding = ASCII;
+                }
+                break;
             case HEIGHT:
                 if (height != -1)
                     ERROR("Duplicate height tag.");
                 str = val;
                 height = get_number(state, &str);
                 if (height < 1)
+                    ERROR("Invalid height.");
+                if (height > 255)
                     ERROR("Invalid height.");
                 break;
             case DEFAULT_WIDTH:
@@ -899,10 +950,18 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
                 if (default_width < 1)
                     ERROR("Invalid fixed width.");
                 break;
+            case INVERTED_MODE:
+                r = check_string_for_value(val, &bools);
+                if (r < 0)
+                    ERROR("Invalid boolean.");
+                default_inverted = r ? 255 : 0;
+                break;
             default:
                 throw_errorf(internal_error, "Oops, forgot to implement %i\n\n", r);
         }
     } while (true);
+
+    /* Populate metrics. */
     if (height == -1)
         ERROR("Need to set font's height.");
     target->height = (uint8_t)height;
@@ -915,17 +974,21 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
     SET_OPTIONAL_PARAM(cap_height);
     SET_OPTIONAL_PARAM(x_height);
     SET_OPTIONAL_PARAM(baseline_height);
+
+    /* Process glyphs. */
     do {
         double_width = default_double_width;
+        inverted = default_inverted;
         /* There's width, default_width, and glyph_width, as well as fixed_width */
         width = -1;
         do {
             r = get_next_line(state);
-            if (r == LINE_TOO_LONG)
+            if (r == LINE_TOO_LONG) {
                 if (*eat_whitespace(state->line) == ':')
                     continue;
                 else
                     ERROR("Line too long.");
+            }
             if (r == EOF && (state_var.line_len == 0 || *eat_whitespace(state_var.line) == '\0'))
                 goto file_done;
             r = *eat_whitespace(state->line);
@@ -939,10 +1002,13 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
             CHECK_FOR_ERROR(r);
             r = check_string_for_value(tag, &glyph_tags);
             if (r < 0)
-                continue;
+                ERROR("Unrecognized tag.");
             if (r == DATA)
                 break;
             switch (r) {
+                case IGNORED_GLYPH_TAG:
+                    /* Do nothing. */
+                    break;
                 case CODEPOINT:
                     str = val;
                     codepoint = get_number(state, &str);
@@ -965,13 +1031,20 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
                     if (width < 1 || width > 24)
                         ERROR("Invalid width.");
                     break;
+                case INVERTED:
+                    r = check_string_for_value(val, &bools);
+                    if (r < 0)
+                        ERROR("Invalid boolean.");
+                    inverted = r ? 255 : 0;
+                    break;
+                default:
+                    throw_errorf(internal_error, "Oops, forgot to implement %i\n\n", r);
             }
         } while (true);
-        /* TODO: Validate that we're not reading a duplicate instance of a glyph. */
         if (codepoint > 255)
             ERROR("Too many code points.");
         if (target->bitmaps[codepoint] != NULL)
-            ERROR("Duplicate code point definition.");
+            throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Duplicate code point definition.", state->line_number, codepoint, codepoint);
         glyph_width = 0;
         for (line = 0; line < height; line++) {
             r = get_next_line(state);
@@ -984,7 +1057,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         /* Figure out intended width */
         if (fixed_width) {
             if (glyph_width > default_width)
-                ERROR("Fixed width is specified, and glyph is too wide.");
+                throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Fixed width is specified, and glyph is too wide.", state->line_number, codepoint, codepoint);
             width = default_width;
         } else if (width == -1) {
             if (glyph_width > default_width)
@@ -992,20 +1065,24 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
             else
                 width = default_width;
         } else if (glyph_width > width)
-            ERROR("Glyph wider than manually set width.");
+            throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Glyph data wider than manually set width.", state->line_number, codepoint, codepoint);
+        if (width < 1)
+            throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Invalid width.  Try setting a width manually.", state->line_number, codepoint, codepoint);
+        if (width > 24)
+            throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Invalid width.", state->line_number, codepoint, codepoint);
         int columns = byte_columns(width);
         target->widths_table[codepoint] = width;
         fontlib_bitmap_t *bitmap_data = malloc(sizeof(fontlib_bitmap_t) + height * columns - sizeof(uint8_t));
         if (bitmap_data == NULL)
             throw_error(malloc_failed, "parse_file: Failed to allocate a bitmap.");
+        target->bitmaps[codepoint] = bitmap_data;
         bitmap_data->length = height * columns;
         uint8_t *ptr = bitmap_data->bytes;
-        target->bitmaps[codepoint] = bitmap_data;
         /* Order bytes into correct order in bitmap. */
         for (line = 0; line < height; line++) {
             uint32_t pixels = glyph_data[line];
             for (int c = 0; c < columns; c++) {
-                *ptr++ = (uint8_t)(pixels >> 24);
+                *ptr++ = (uint8_t)((pixels >> 24) ^ inverted);
                 pixels <<= 8;
             }
         }
@@ -1014,14 +1091,15 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         count++;
         codepoint++;
     } while (true);
-file_done:
+
+file_done: /* We're done!  Clean up a bit. */
     if (!count)
         throw_error(text_parser_error, "Reached end of file without reading any glyphs.");
     target->first_glyph = (uint8_t)first_glyph;
     codepoint = first_glyph;
     for (int i = count; i > 0; i--)
         if (!target->bitmaps[codepoint++])
-            throw_errorf(text_parser_error, "Need definition for glyph %i (0x%02X).", codepoint, codepoint);
+            throw_errorf(text_parser_error, "Need definition for code point %i (0x%02X).", codepoint - 1, codepoint - 1);
     target->total_glyphs = count;
     /* Widths and bitmaps tables need to be trimmed. */
     if (first_glyph) {

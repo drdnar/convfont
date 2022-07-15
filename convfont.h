@@ -127,7 +127,7 @@ typedef struct {
  * Compares a string against a list of strings and numeric values to associate
  * with that string.  Returns -1 if no match is found.
  */
-int check_string_for_value(char *string, string_list_t *possible_values);
+int check_string_for_value(const char *string, const string_list_t *possible_values);
 
 /**
  * Compares two strings, ignoring case.

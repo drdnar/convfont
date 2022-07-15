@@ -64,7 +64,7 @@ string_list_t styles = {
 
 /* Compares a string against a list of strings and numeric values to associate
 with that string.  Returns -1 if no match is found. */
-int check_string_for_value(char *string, string_list_t *possible_values) { 
+int check_string_for_value(const char *string, const string_list_t *possible_values) { 
     for (int i = 0; i < possible_values->count; i++)
         if (strcaseeq(string, possible_values->strings[i].string))
             return possible_values->strings[i].value;
@@ -112,7 +112,7 @@ noreturn void vthrow_errorf(const int code, const char *string, va_list args) {
 
 
 /*******************************************************************************
-*                         SOME OUTPUT RELATED STUFF                            *
+*                         SOME OUTPUT-RELATED STUFF                            *
 *******************************************************************************/
 
 bool unix_newline_style =
