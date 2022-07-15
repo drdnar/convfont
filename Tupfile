@@ -29,6 +29,7 @@ endif
 
 SRCS += convfont.c
 SRCS += parse_fnt.c
+SRCS += parse_text.c
 SRCS += serialize_font.c
 ifneq ($(GETOPT),system)
   SRCS += getopt.c
