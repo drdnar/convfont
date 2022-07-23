@@ -91,6 +91,11 @@ string_value_pair_t font_tag_names[] =
     { "bitmaps", GLYPH_DATA },
     { "font data", GLYPH_DATA },
     { "data", GLYPH_DATA },
+    { "[glyphs]", GLYPH_DATA },
+    { "[characters]", GLYPH_DATA },
+    { "[bitmaps]", GLYPH_DATA },
+    { "[font data]", GLYPH_DATA },
+    { "[data]", GLYPH_DATA },
 };
 
 const string_list_t font_tags = {
@@ -110,6 +115,10 @@ string_value_pair_t glyph_tag_names[] =
 {
     { "name", IGNORED_GLYPH_TAG },
     { "unicode", IGNORED_GLYPH_TAG },
+    { "[character]", IGNORED_GLYPH_TAG },
+    { "[char]", IGNORED_GLYPH_TAG },
+    { "[glyph]", IGNORED_GLYPH_TAG },
+    { "[next]", IGNORED_GLYPH_TAG },
     { "double", DOUBLE_WIDTH },
     { "doublewidth", DOUBLE_WIDTH },
     { "double width", DOUBLE_WIDTH },
@@ -124,6 +133,9 @@ string_value_pair_t glyph_tag_names[] =
     { "data", DATA },
     { "image", DATA },
     { "bitmap", DATA },
+    { "[data]", DATA },
+    { "[image]", DATA },
+    { "[bitmap]", DATA },
 };
 
 const string_list_t glyph_tags = {
@@ -133,13 +145,15 @@ const string_list_t glyph_tags = {
 string_value_pair_t bool_names[] =
 {
     { "false", 0 },
+    { "f", 0 },
     { "no", 0 },
-    { "0", 0 },
     { "n", 0 },
+    { "0", 0 },
     { "nope", 0 },
     { "nah", 0 },
     { "nay", 0 },
     { "true", 1 },
+    { "t", 1 },
     { "yes", 1 },
     { "y", 1 },
     { "1", 1 },
@@ -220,7 +234,7 @@ typedef struct parser_state {
 
 /******************************************************************************/
 
-#define ERROR(X) throw_errorf(text_parser_error, "Line %i: %s", state->line_number, X)
+#define ERROR(X) throw_errorf(text_parser_error, "Line %i: " X, state->line_number)
 
 #define NEXT_RAW(X) do { if ((X = fgetc(state->file)) < 0) return X; } while (false)
 #define NEXT_RAW_THROW(X, Y) do { if ((X = fgetc(state->file)) < 0) ERROR(Y); } while (false)
@@ -382,6 +396,7 @@ static void init_parser(parser_state_t *state, FILE *file, char encoding) {
     state->encoding = encoding;
     state->line_number = 1;
     state->bom_found = false;
+    bool ini = false;
     int c, c2;
     NEXT_RAW_THROW(c, "Out of bytes in header.");
     NEXT_RAW_THROW(c2, "Out of bytes in header.");
@@ -400,6 +415,8 @@ static void init_parser(parser_state_t *state, FILE *file, char encoding) {
         else
             ERROR("BOM-like bytes not valid.");
         NEXT_THROW(c2, "Out of bytes in header.");
+        if (ini = (c2 == '['))
+            NEXT_THROW(c2, "Out of bytes in header.");
         if (tolower(c2) != 'c')
             ERROR("File does not start with \"convfont\".");
     } else if (c == 0xEF) {
@@ -414,23 +431,46 @@ static void init_parser(parser_state_t *state, FILE *file, char encoding) {
         else
             ERROR("File starts with UTF-8 BOM, but different encoding requested.");
         NEXT_THROW(c2, "Out of bytes in header.");
+        if (ini = (c2 == '['))
+            NEXT_THROW(c2, "Out of bytes in header.");
         if (tolower(c2) != 'c')
             ERROR("File does not start with \"convfont\".");
         state->bom_found = true;
     } else {
         /* Detect UTF-16 without BOM. */
-        if (tolower(c) == 'c' && c2 == '\0')
+        if (c2 == '\0' && (tolower(c) == 'c' || c == '[')) {
+            if (ini = (c == '[')) {
+                NEXT_RAW_THROW(c, "Out of bytes in header.");
+                NEXT_RAW_THROW(c2, "Out of bytes in header.");
+                if (tolower(c) != 'c')
+                    ERROR("File does not start with \"convfont\".");
+                if (c2 != '\0')
+                    ERROR("Corrupted encoding.");
+            }
             if (encoding == UTF16LE || encoding == UNKNOWN)
                 state->encoding = UTF16LE;
             else
                 ERROR("File does not start with \"convfont\".");
-        else if (c == '\0' && tolower(c2) == 'c')
+        } else if (c == '\0' && (tolower(c2) == 'c' || c2 == '[')) {
+            if (ini = (c2 == '[')) {
+                NEXT_RAW_THROW(c, "Out of bytes in header.");
+                NEXT_RAW_THROW(c2, "Out of bytes in header.");
+                if (c != '\0')
+                    ERROR("Corrupted encoding.");
+                if (tolower(c2) != 'c')
+                    ERROR("File does not start with \"convfont\".");
+            }
             if (encoding == UTF16BE || encoding == UNKNOWN)
                 state->encoding = UTF16BE;
             else
                 ERROR("File does not start with \"convfont\".");
-        else if (tolower(c) == 'c') {
+        } else if (tolower(c) == 'c' || c == '[') {
             /* Assume UTF-8. */
+            if (ini = (c == '[')) {
+                NEXT_RAW_THROW(c, "Out of bytes in header.");
+                if (tolower(c) != 'c')
+                    ERROR("File does not start with \"convfont\".");
+            }
             if (encoding != UNKNOWN)
                 state->encoding = UTF8;
             ungetc(c2, state->file);
@@ -444,7 +484,10 @@ static void init_parser(parser_state_t *state, FILE *file, char encoding) {
         if (eader[i] != tolower(c))
             ERROR("File does not start with \"convfont\".");
     }
-    if (get_next(state) != '\n')
+    c = get_next(state);
+    if (ini && c == ']')
+        c = get_next(state);
+    if (c != '\n')
         ERROR("File does not start with \"convfont\" and newline.");
     if (state->encoding == UNKNOWN)
         state->encoding = UTF8;
@@ -520,29 +563,26 @@ static char *eat_whitespace(char *str) {
  * @param output Pointer to output string.  This will be become NULL terminated.
  * @param max_len Size of output string buffer.
  * @return int Number of characters consumed.  Negative value on error.
- * EOF means input ended before ':'.  LINE_TOO_LONG means out of output space.
+ * EOF means input ended before ':' or '='.  LINE_TOO_LONG means out of output space.
  */
 static int extract_field(char *input_string, bool mode, char *output, int max_len) {
-    if (max_len <= 0) /* ? ? ? */
-        throw_error(internal_error, "extract_field: max_len <= 0");
+    if (max_len <= 1) /* ? ? ? */
+        throw_error(internal_error, "extract_field: max_len <= 1");
     /* Eat leading whitespace */
     char *input = eat_whitespace(input_string);
-    char c = *input;
-    /* You should never do this. */
-    if (max_len == 1) {
-        *output = '\0';
-        if ((!mode && c == ':') || (mode && c == '\0'))
-            return (int)(input - input_string);
-        else
-            return EOF;
-    }
+    char c;
     /* Extract data */
     do {
-        if (max_len-- <= 0)
-            break;
+        if (max_len-- <= 0) {
+            *--output = '\0';
+            return LINE_TOO_LONG;
+        }
         c = *input++;
-        if (c == ':' && !mode)
+        if ((c == ':' || c == '=' || c == ']') && !mode) {
+            if (c == ']')
+                *output++ = ']';
             break;
+        }
         if (c == '\0') {
             if (mode)
                 break;
@@ -558,10 +598,6 @@ static int extract_field(char *input_string, bool mode, char *output, int max_le
         }
         *output++ = c;
     } while (true);
-    if (max_len < 0) {
-        /* We're here because there isn't even space for the null terminator. */
-        return LINE_TOO_LONG;
-    }
     *output-- = '\0';
     /* Eat any possible trailing whitespace */
     if (*output == ' ')
@@ -595,12 +631,13 @@ static int get_number(parser_state_t *state, char **str) {
     char c = *string;
     char next = '\0';
     int i = 0;
+#define GET_NUMBER_RETURN(X) do { if (str != NULL) *str = string; if (X < 0) ERROR("Overflow parsing number."); return X; } while (false)
     switch (c) {
         case '\'':
             next = '\'';
-        case '\"':
+        case '\"': /* Intentional fall-through */
             c = *++string;
-            if (c == '\0' || c == '\n')
+            if (c == '\0' || c == '\n' || (c == '\'' && next == '\'') || (c == '\"' && next != '\''))
                 ERROR("Invalid char literal.");
             string++;
             if (c == '\\') {
@@ -651,23 +688,19 @@ static int get_number(parser_state_t *state, char **str) {
                         break;
                 }
                 if (i < 0)
-                    i = (((unsigned int)-1) >> 1) & i;
+                    ERROR("Overflow parsing escape sequence.");
             } else
                 i = (unsigned char)c;
-            if ((next == '\'' && *string == '\'') || (next != '\'' && *string == '\"')) {
-                *str = string;
-                return i;
-            }
+            if ((next == '\'' && *string == '\'') || (next != '\'' && *string == '\"'))
+                GET_NUMBER_RETURN(i);
             ERROR("Invalid char literal.");
         case 'U': case 'u':
             if (*++string != '+')
                 ERROR("Invalid Unicode identifier.");
         case '$': /* Intentional fall-through */
-            string++;
             while ((c = dehexify(*++string)) < 16)
                 i = (i << 4) | c;
-            *str = string;
-            return i;
+            GET_NUMBER_RETURN(i);
         case '0':
             c = tolower(*++string);
             if (c == 'x') {
@@ -676,20 +709,16 @@ static int get_number(parser_state_t *state, char **str) {
                 i = c;
                 while ((c = dehexify(*++string)) < 16)
                     i = (i << 4) | c;
-                *str = string;
-                return i;
-            } else if (c < '0' || c > '9') {
-                *str = string;
-                return 0;
-            }
+                GET_NUMBER_RETURN(i);
+            } else if (c < '0' || c > '9')
+                GET_NUMBER_RETURN(0);
         case '1': case '2': case '3': case '4': /* Intentional fall-through */
         case '5': case '6': case '7': case '8': case '9':
             do {
                 i = (i * 10) + (c - '0');
                 c = *++string;
             } while (c >= '0' && c <= '9');
-            *str = string;
-            return i;
+            GET_NUMBER_RETURN(i);
     }
     ERROR("Invalid number.");
     return -1;
@@ -834,13 +863,11 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
     
     /* Process header/metadata. */
     do {
-        /* Read a line and ingore empty lines and whitespace. */
+        /* Read a line and ignore empty lines, comments, and whitespace. */
         r = get_next_line(state);
-        if (r == LINE_TOO_LONG && *eat_whitespace(state->line) == ':')
-            continue;
+        str = eat_whitespace(state->line);
         CHECK_FOR_ERROR(r);
-        r = *eat_whitespace(state->line);
-        if (r == ':' || r == '\0')
+        if (*str == ':' || *str == '#' || *str == '\0')
             continue;
         /* Figure out what's happening on this line. */
         tag_length = extract_field(state->line, false, tag, MAX_LINE_LENGTH);
@@ -981,19 +1008,19 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         inverted = default_inverted;
         /* There's width, default_width, and glyph_width, as well as fixed_width */
         width = -1;
+        bool got_tags = false;
+        /* Process glyph metadata. */
         do {
             r = get_next_line(state);
-            if (r == LINE_TOO_LONG) {
-                if (*eat_whitespace(state->line) == ':')
-                    continue;
-                else
-                    ERROR("Line too long.");
-            }
+            str = eat_whitespace(state->line);
             if (r == EOF && (state_var.line_len == 0 || *eat_whitespace(state_var.line) == '\0'))
-                goto file_done;
-            r = *eat_whitespace(state->line);
-            if (r == ':' || r == '\0')
+                if (got_tags)
+                    ERROR("Unexpected end of file.");
+                else
+                    goto file_done;
+            if (*str == ':' || *str == '#' || *str == '\0')
                 continue;
+            CHECK_FOR_ERROR(r);
             tag_length = extract_field(state->line, false, tag, MAX_LINE_LENGTH);
             if (tag_length == EOF)
                 ERROR("Tag expected.");
@@ -1005,6 +1032,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
                 ERROR("Unrecognized tag.");
             if (r == DATA)
                 break;
+            got_tags = true;
             switch (r) {
                 case IGNORED_GLYPH_TAG:
                     /* Do nothing. */
@@ -1013,7 +1041,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
                     str = val;
                     codepoint = get_number(state, &str);
                     if (codepoint > 255)
-                        ERROR("Cannot have code point greater than zero.");
+                        ERROR("Cannot have code point greater than 255.");
                     break;
                 case DOUBLE_WIDTH:
                     r = check_string_for_value(val, &bools);
@@ -1057,7 +1085,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         /* Figure out intended width */
         if (fixed_width) {
             if (glyph_width > default_width)
-                throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Fixed width is specified, and glyph is too wide.", state->line_number, codepoint, codepoint);
+                throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Bitmap is wider than specified fixed width.", state->line_number, codepoint, codepoint);
             width = default_width;
         } else if (width == -1) {
             if (glyph_width > default_width)
@@ -1065,7 +1093,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
             else
                 width = default_width;
         } else if (glyph_width > width)
-            throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Glyph data wider than manually set width.", state->line_number, codepoint, codepoint);
+            throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Bitmap wider than manually set width.", state->line_number, codepoint, codepoint);
         if (width < 1)
             throw_errorf(text_parser_error, "Near line %i processing code point %i (0x02X): Invalid width.  Try setting a width manually.", state->line_number, codepoint, codepoint);
         if (width > 24)
