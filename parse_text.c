@@ -278,8 +278,6 @@ static int get_next_char(parser_state_t *state) {
         } else if (state->expecting == NEXT)
             ERROR("UTF-16 decoder: Expected second half of surrogate pair.");
     } else if (state->encoding == UTF8) {
-        if (c == 0)
-            ERROR("Null in input text.");
         if (c >= 0xF5)
             ERROR("UTF-8 decoder: Invalid byte >= 0xF5.");
         /* Read multibyte sequence */
@@ -291,11 +289,10 @@ static int get_next_char(parser_state_t *state) {
             } else if (c >= 0xE0) {
                 c &= 0xF;
                 required_bytes = 2;
-            } else if (c >= 0xC2) {
+            } else {
                 c &= 0x1F;
                 required_bytes = 1;
-            } else if (c >= 0x80)
-                ERROR("UTF-8 decoder: Invalid byte.");
+            }
             while (required_bytes --> 0) {
                 NEXT_RAW_THROW(c2, "UTF-8 decoder: Failed to get subsequent byte(s) of multibyte sequence.");
                 if (c2 < 0x80 || c2 >= 0xC0)
@@ -368,6 +365,40 @@ read_again:
             case 0x2060: /* Word joiner */
             case 0xFEFF: /* Zero width non-breaking space or Byte order mark */
                 goto read_again;
+            case 0x2018: /* Left single quotation mark */
+            case 0x2019: /* Right single quotation mark */
+            case 0x201A: /* Single low-9 quotation mark */
+            case 0x201B: /* Single high-reversed-9 quotation mark */
+            case 0x2039: /* < */
+            case 0x203A: /* > */
+            case 0x231C: /* Top left corner */
+            case 0x231D: /* Top right corner */
+            case 0x300C: /* Left corner bracket */
+            case 0x300D: /* Right corner bracket */
+            case 0xFE41: /* Presentation form for vertical left corner bracket */
+            case 0xFE42: /* Presentation form for vertical right corner bracket */
+            case 0xFF07: /* Fullwidth apostrophe */
+            case 0xFF62: /* Halfwidth left corner bracket */
+            case 0xFF63: /* Halfwidth right corner bracket */
+                c = '\'';
+                break;
+            case 0x00AB: /* << */
+            case 0x00BB: /* >> */
+            case 0x201C: /* Left double quotation mark */
+            case 0x201D: /* Right double quotation mark */
+            case 0x201E: /* Double low-9 quotation mark */
+            case 0x201F: /* Double high-reversed-9 quotation mark */
+            case 0x2E42: /* Double low-reversed-9 quotation mark */
+            case 0x300E: /* Left white corner bracket */
+            case 0x300F: /* Right white corner bracket */
+            case 0x301D: /* Reversed double prime quotation mark */
+            case 0x301E: /* Double prime quotation mark */
+            case 0x301F: /* Low double prime quotation mark */
+            case 0xFE43: /* Presentation form for vertical left white corner bracket */
+            case 0xFE44: /* Presentation form for vertical right white corner bracket */
+            case 0xFF02: /* Fullwidth quotation mark */
+                c = '\"';
+                break;
         }
         if (c >= 0x300 && c < 0x370) /* Combining diacritical marks */
             goto read_again;
@@ -479,7 +510,7 @@ static void init_parser(parser_state_t *state, FILE *file, char encoding) {
     }
     /* Detect rest of header. */
     char eader[] = "onvfont";
-    for (int i = 0; i < strlen(eader); i++) {
+    for (int i = 0; i < sizeof(eader) - 1; i++) {
         NEXT_THROW(c, "Out of bytes in header.");
         if (eader[i] != tolower(c))
             ERROR("File does not start with \"convfont\".");
@@ -739,7 +770,7 @@ typedef struct {
 /**
  * Parses a line of text as a bitmap.
  */
-static bitmap_line_t prase_bitmap(char *text, bool double_width) {
+static bitmap_line_t parse_bitmap(char *text, bool double_width) {
     bitmap_line_t line = { 0, 0 };
     uint32_t bit = 0x80000000;
     for (char c = *text++; c != '\0'; c = *text++) {
@@ -1077,7 +1108,7 @@ fontlib_font_t *parse_text(FILE *in_file, char encoding) {
         for (line = 0; line < height; line++) {
             r = get_next_line(state);
             CHECK_FOR_ERROR(r);
-            bitmap_line_t bitmap = prase_bitmap(state->line, double_width);
+            bitmap_line_t bitmap = parse_bitmap(state->line, double_width);
             glyph_data[line] = bitmap.bitmap;
             if (bitmap.width > glyph_width)
                 glyph_width = bitmap.width;
