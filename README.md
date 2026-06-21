@@ -61,7 +61,7 @@ For example, if you specify an output file named `myfont.inc` you can use it in 
  }
  fontlib_font_t my_font* = (fontlib_font_t *)my_font_data;
  . . .
- fontlib_SetFont(my_font, 0);
+ fontlib_LoadFont(my_font, 0);
  ```
 
 ### Assembly Array
